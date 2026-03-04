@@ -1,0 +1,90 @@
+:root {
+  --win-gray: #c0c0c0;
+  --win-blue: #000080;
+  --win-border-light: #ffffff;
+  --win-border-dark: #808080;
+}
+
+body {
+  background-color: #008080; 
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Tahoma', sans-serif;
+  overflow: hidden; 
+}
+
+.win95-container {
+  background: var(--win-gray);
+  border: 2px solid;
+  border-color: var(--win-border-light) var(--win-border-dark) var(--win-border-dark) var(--win-border-light);
+  width: 600px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 2px 0 black;
+  z-index: 2;
+}
+
+.window-header {
+  background: var(--win-blue);
+  color: white;
+  padding: 3px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+}
+
+.window-body {
+  padding: 15px;
+  overflow-y: auto; 
+}
+
+.taskbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35px;
+  background: var(--win-gray);
+  border-top: 2px solid var(--win-border-light);
+  display: flex;
+  align-items: center;
+  padding: 2px 5px;
+  gap: 5px;
+  z-index: 10;
+}
+
+.start-button {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 2px solid;
+  border-color: var(--win-border-light) var(--win-border-dark) var(--win-border-dark) var(--win-border-light);
+}
+
+.taskbar-item {
+  border: 2px solid;
+  border-color: var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);
+  padding: 2px 10px;
+  font-size: 12px;
+  background: #d0d0d0;
+  min-width: 120px;
+}
+
+.win95-fieldset { border: 2px solid var(--win-border-dark); margin-bottom: 15px; padding: 10px; }
+.win95-table { width: 100%; background: white; border: 2px solid var(--win-border-dark); border-collapse: collapse; }
+.win95-table th { background: var(--win-gray); border: 1px solid var(--win-border-dark); padding: 5px; }
+.win95-table td { border: 1px solid #ddd; padding: 5px; }
+.win95-btn { background: var(--win-gray); border: 2px solid; border-color: var(--win-border-light) var(--win-border-dark) var(--win-border-dark) var(--win-border-light); padding: 4px 10px; cursor: pointer; }
+.win95-btn:active { border-color: var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark); }
+.status-bar { display: flex; border-top: 2px solid var(--win-border-dark); margin-top: 10px; gap: 2px; }
+.status-field { border: 2px solid; border-color: var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark); padding: 2px 5px; flex: 1; font-size: 11px; }
+.low-stock { color: red; font-weight: bold; }
