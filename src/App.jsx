@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Formulario from './components/Formulario';
 import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
+import ListaAcessos from './components/ListaAcessos'; // Importando o novo componente
 
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -113,11 +114,17 @@ function App() {
           />
         </div>
 
-        <TabelaEstoque 
-          materiais={materiaisFiltrados} 
-          aoRemover={removerBem}
-          podeEditar={eAdmin} 
-        />
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1 }}>
+            <TabelaEstoque 
+              materiais={materiaisFiltrados} 
+              aoRemover={removerBem}
+              podeEditar={eAdmin} 
+            />
+          </div>
+
+          {eAdmin && <ListaAcessos />}
+        </div>
         
         <div style={{ 
           marginTop: '25px', 
