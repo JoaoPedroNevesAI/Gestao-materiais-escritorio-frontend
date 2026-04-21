@@ -1,23 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { listarCategorias } from '../services/api';
-import { toast } from 'react-toastify';
 
 export default function Formulario({ aoAdicionar }) {
 
+  const [preview, setPreview] = useState('');
   const [categorias, setCategorias] = useState([]);
 
   useEffect(() => {
-    carregarCategorias();
+    listarCategorias().then(setCategorias);
   }, []);
-
-  const carregarCategorias = async () => {
-    try {
-      const data = await listarCategorias();
-      setCategorias(data);
-    } catch {
-      toast.error("Erro ao carregar categorias");
-    }
-  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -29,13 +20,16 @@ export default function Formulario({ aoAdicionar }) {
       nome: dadosForm.nome,
       descricao: dadosForm.descricao,
       quantidade: parseInt(dadosForm.quantidade),
-      categoriaId: parseInt(dadosForm.categoriaId),
+      categoriaId: dadosForm.categoriaId ? parseInt(dadosForm.categoriaId) : null,
       local: dadosForm.local || null,
-      valor: dadosForm.valor ? parseFloat(dadosForm.valor) : null
+      valor: dadosForm.valor ? parseFloat(dadosForm.valor) : null,
+      imagemUrl: dadosForm.imagemUrl || null
     };
 
     aoAdicionar(material);
+
     e.target.reset();
+    setPreview('');
   };
 
   return (
@@ -53,7 +47,7 @@ export default function Formulario({ aoAdicionar }) {
         
         <input 
           name="nome" 
-          placeholder="Nome do Bem" 
+          placeholder="Nome do Bem"
           required 
           style={{ gridColumn: 'span 2' }} 
         />
@@ -72,9 +66,8 @@ export default function Formulario({ aoAdicionar }) {
           placeholder="Valor (R$)" 
         />
 
-        <select name="categoriaId" required>
+        <select name="categoriaId">
           <option value="">Selecione uma categoria</option>
-
           {categorias.map(cat => (
             <option key={cat.id} value={cat.id}>
               {cat.nome}
@@ -86,14 +79,31 @@ export default function Formulario({ aoAdicionar }) {
           <option value="">Local (Opcional)</option>
           <option value="Recepção">Recepção</option>
           <option value="Escritório">Escritório</option>
-          <option value="TI">TI</option>
+          <option value="TI">Departamento de TI</option>
         </select>
 
         <textarea 
           name="descricao" 
-          placeholder="Descrição" 
-          style={{ gridColumn: 'span 2' }} 
+          placeholder="Descrição"
+          style={{ gridColumn: 'span 2', padding: '10px' }} 
         />
+
+        <input 
+          name="imagemUrl"
+          placeholder="URL da imagem"
+          style={{ gridColumn: 'span 2' }}
+          onChange={(e) => setPreview(e.target.value)}
+        />
+
+        {preview && (
+          <div style={{ gridColumn: 'span 2', textAlign: 'center' }}>
+            <img 
+              src={preview}
+              alt="Preview"
+              style={{ width: '120px', borderRadius: '8px' }}
+            />
+          </div>
+        )}
 
         <button 
           type="submit" 
