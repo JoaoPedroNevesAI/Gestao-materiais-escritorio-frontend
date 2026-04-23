@@ -111,6 +111,7 @@ function App() {
           materiais={materiaisFiltrados}
           aoRemover={removerBem}
           podeEditar={eAdmin}
+          usuarioLogado={usuarioLogado}
         />
       </div>
     </div>
