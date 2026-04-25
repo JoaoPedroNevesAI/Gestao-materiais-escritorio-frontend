@@ -1,100 +1,121 @@
 import { useState, useEffect } from 'react';
 import Formulario from './components/Formulario';
 import TabelaEstoque from './components/TabelaEstoque';
+import Login from './components/Login';
+import { ToastContainer, toast } from 'react-toastify';
+import { listarMateriais, salvarMaterial, deletarMaterial } from './services/api';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
-  const [materiais, setMateriais] = useState(() => {
-    const salvo = localStorage.getItem('estoque_v2');
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
+  const [usuarioLogado, setUsuarioLogado] = useState(null);
+  const [bens, setBens] = useState([]);
   const [busca, setBusca] = useState('');
 
+  // Carrega os dados assim que o usuário loga
   useEffect(() => {
-    localStorage.setItem('estoque_v2', JSON.stringify(materiais));
-  }, [materiais]);
+    if (usuarioLogado) {
+      listarMateriais()
+        .then(setBens)
+        .catch(() => toast.error("Erro ao carregar dados do servidor. Verifique se o Back-end está ligado."));
+    }
+  }, [usuarioLogado]);
 
-  const totalItens = materiais.length;
-  const itensCriticos = materiais.filter(m => m.quantidade < 3).length;
-
-  const materiaisFiltrados = materiais.filter(m => 
-    m.nome.toLowerCase().includes(busca.toLowerCase())
-  );
-
-  const adicionarMaterial = (nome, quantidade) => {
-    const novo = { id: Date.now(), nome, quantidade };
-    setMateriais([...materiais, novo]);
-  };
-
-  const alterarQtd = (id, delta) => {
-    setMateriais(materiais.map(item => 
-      item.id === id ? { ...item, quantidade: Math.max(0, item.quantidade + delta) } : item
-    ));
-  };
-
-  const removerMaterial = (id) => {
-    if(confirm("Deseja deletar este registro?")) {
-      setMateriais(materiais.filter(i => i.id !== id));
+  // ✅ SALVAR: Liberado para qualquer usuário logado
+  const aoAdicionarBemNoBanco = async (material) => {
+    try {
+      // Adiciona o nome de quem está logado ao objeto antes de enviar, se necessário
+      const materialComUsuario = { ...material, cadastradoPor: usuarioLogado.nome };
+      
+      const novo = await salvarMaterial(materialComUsuario);
+      setBens(prev => [...prev, novo]);
+      toast.success(`Sucesso: ${novo.nome} registrado!`);
+    } catch (err) {
+      toast.error("Erro ao salvar no servidor.");
+      console.error(err);
     }
   };
 
+  // ✅ DELETE: Liberado geral (removida a trava de eAdmin)
+  const removerBem = async (id) => {
+    if (confirm("Deseja confirmar a baixa deste patrimônio?")) {
+      try {
+        await deletarMaterial(id);
+
+        const bemRemovido = bens.find(b => b.id === id);
+        setBens(bens.filter(b => b.id !== id));
+
+        toast.warn(`O item "${bemRemovido?.nome}" recebeu baixa.`);
+      } catch (err) {
+        toast.error("Erro ao remover no servidor. O Back-end pode estar bloqueando a exclusão.");
+        console.error("Erro ao deletar:", err);
+      }
+    }
+  };
+
+  // Filtro de busca
+  const materiaisFiltrados = bens.filter(b => 
+    b.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+    b.descricao?.toLowerCase().includes(busca.toLowerCase())
+  );
+
+  // Se não estiver logado, mostra tela de Login
+  if (!usuarioLogado) {
+    return (
+      <>
+        <ToastContainer position="top-center" autoClose={3000} theme="colored" />
+        <Login aoLogar={setUsuarioLogado} />
+      </>
+    );
+  }
+
   return (
-    <>
-      <div className="win95-container">
-        <div className="window-header">
-          <span className="title">📦 SISTEMA_ESTOQUE.EXE</span>
-          <div className="window-controls">
-            <button className="ctrl-btn">_</button>
-            <button className="ctrl-btn">□</button>
-            <button className="ctrl-btn close">X</button>
-          </div>
+    <div className="app-container">
+      <ToastContainer position="top-right" autoClose={3000} theme="light" />
+
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <div>
+          <h1 style={{ margin: 0, color: '#1a73e8' }}>🏛️ Gestão de Patrimônio</h1>
+          <p style={{ color: '#5f6368', margin: '5px 0 0 0' }}>Painel Administrativo Web</p>
         </div>
 
-        <div className="window-body">
-          <Formulario aoAdicionar={adicionarMaterial} />
-          
-          <div style={{ margin: '15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label>Buscar:</label>
-            <input 
-              type="text" 
-              placeholder="Procurar item..." 
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              style={{ flex: 1 }}
-            />
-          </div>
+        <div style={{ textAlign: 'right', backgroundColor: '#fff', padding: '10px 15px', borderRadius: '8px', border: '1px solid #dadce0' }}>
+          <span>Usuário: </span>
+          <strong>{usuarioLogado.nome}</strong>
+          <button
+            onClick={() => {
+              setUsuarioLogado(null);
+              toast.info("Sessão encerrada.");
+            }}
+            className="btn btn-danger"
+            style={{ marginLeft: '10px' }}
+          >
+            Sair
+          </button>
+        </div>
+      </header>
 
-          <TabelaEstoque 
-            materiais={materiaisFiltrados} 
-            aoAlterar={alterarQtd} 
-            aoRemover={removerMaterial} 
+      {/* Formulário agora aparece para todos os logados */}
+      <Formulario aoAdicionar={aoAdicionarBemNoBanco} />
+
+      <div className="card">
+        <div style={{ marginBottom: '20px' }}>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Buscar por nome ou descrição..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            style={{ padding: '10px', width: '100%', borderRadius: '8px', border: '1px solid #ddd' }}
           />
         </div>
 
-        <div className="status-bar">
-          <div className="status-field">Total de Registros: {totalItens}</div>
-          <div className="status-field" style={{ color: itensCriticos > 0 ? 'red' : 'black' }}>
-            Itens Críticos: {itensCriticos}
-          </div>
-          <div className="status-field">SISTEMA OK</div>
-        </div>
+        <TabelaEstoque
+          materiais={materiaisFiltrados}
+          aoRemover={removerBem}
+          podeEditar={true} // Forçado como true para liberar botões
+        />
       </div>
-
-      <div className="taskbar">
-        <button className="start-button">
-          <span style={{ fontSize: '16px' }}>🪟</span> 
-          <strong>Iniciar</strong>
-        </button>
-        
-        <div className="taskbar-item">
-          📦 SISTEMA_ESTOQUE.EXE
-        </div>
-
-        <div className="taskbar-clock">
-          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
