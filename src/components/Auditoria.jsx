@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-export default function Auditoria() {
+export default function Auditoria({ darkMode }) { // Recebendo a prop darkMode
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    // Aqui buscaremos os logs do backend no futuro
-    // fetch('http://localhost:8080/api/auditoria').then(...)
-    
-    // MOCK: Dados de exemplo para você ver como fica
+    // MOCK: Dados de exemplo
     setLogs([
       { id: 1, usuario: 'Luiz', acao: 'Cadastrou', item: 'Monitor Dell', data: '29/04/2026 14:00' },
       { id: 2, usuario: 'João Backend', acao: 'Moveu', item: 'Cadeira Gamer', detalhe: 'TI -> Recepção', data: '29/04/2026 15:30' },
@@ -15,39 +12,72 @@ export default function Auditoria() {
     ]);
   }, []);
 
+  // Estilos baseados no tema
+  const styles = {
+    card: {
+      marginTop: '20px',
+      backgroundColor: darkMode ? '#1e1e1e' : '#fff',
+      padding: '20px',
+      borderRadius: '12px',
+      color: darkMode ? '#e0e0e0' : '#333',
+      border: `1px solid ${darkMode ? '#333' : '#ddd'}`,
+      transition: 'all 0.2s'
+    },
+    headerTable: {
+      textAlign: 'left',
+      backgroundColor: darkMode ? '#2d2d2d' : '#f8f9fa',
+      color: darkMode ? '#aaa' : '#555'
+    },
+    row: {
+      borderBottom: `1px solid ${darkMode ? '#333' : '#eee'}`
+    },
+    subText: {
+      color: darkMode ? '#888' : '#666',
+      fontSize: '12px'
+    }
+  };
+
   return (
-    <div className="card" style={{ marginTop: '20px' }}>
-      <h3 style={{ borderBottom: '2px solid #1a73e8', paddingBottom: '10px' }}>
+    <div style={styles.card}>
+      <h3 style={{ borderBottom: '2px solid #1a73e8', paddingBottom: '10px', marginTop: 0 }}>
         📜 Registro de Auditoria (Logs do Sistema)
       </h3>
       
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
         <thead>
-          <tr style={{ textAlign: 'left', backgroundColor: '#f8f9fa' }}>
-            <th style={{ padding: '10px' }}>Usuário</th>
-            <th style={{ padding: '10px' }}>Ação</th>
-            <th style={{ padding: '10px' }}>Item</th>
-            <th style={{ padding: '10px' }}>Data/Hora</th>
+          <tr style={styles.headerTable}>
+            <th style={{ padding: '12px' }}>Usuário</th>
+            <th style={{ padding: '12px' }}>Ação</th>
+            <th style={{ padding: '12px' }}>Item</th>
+            <th style={{ padding: '12px' }}>Data/Hora</th>
           </tr>
         </thead>
         <tbody>
           {logs.map(log => (
-            <tr key={log.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '10px' }}><strong>{log.usuario}</strong></td>
-              <td style={{ padding: '10px' }}>
+            <tr key={log.id} style={styles.row}>
+              <td style={{ padding: '12px' }}><strong>{log.usuario}</strong></td>
+              <td style={{ padding: '12px' }}>
                 <span style={{ 
-                  padding: '3px 8px', 
+                  padding: '4px 10px', 
                   borderRadius: '12px', 
-                  fontSize: '12px',
-                  backgroundColor: log.acao.includes('Cadastrou') ? '#d4edda' : '#fff3cd' 
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  // Cores de fundo adaptativas para as etiquetas
+                  backgroundColor: log.acao.includes('Cadastrou') 
+                    ? (darkMode ? '#1b4721' : '#d4edda') 
+                    : (darkMode ? '#533f03' : '#fff3cd'),
+                  color: log.acao.includes('Cadastrou')
+                    ? (darkMode ? '#81c784' : '#155724')
+                    : (darkMode ? '#ffd54f' : '#856404')
                 }}>
                   {log.acao}
                 </span>
               </td>
-              <td style={{ padding: '10px' }}>
-                {log.item} {log.detalhe && <small style={{ color: '#666' }}>({log.detalhe})</small>}
+              <td style={{ padding: '12px' }}>
+                {log.item} {log.detalhe && <span style={styles.subText}>({log.detalhe})</span>}
               </td>
-              <td style={{ padding: '10px', fontSize: '13px', color: '#666' }}>{log.data}</td>
+              <td style={{ padding: '12px', ...styles.subText }}>{log.data}</td>
             </tr>
           ))}
         </tbody>
