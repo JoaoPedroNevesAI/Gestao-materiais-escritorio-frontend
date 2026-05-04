@@ -4,24 +4,21 @@ import { QRCodeSVG } from 'qrcode.react'; // Lembra de rodar: npm install qrcode
 // Componente recebe:
 // - materiais: lista de itens do estoque
 // - aoRemover: função para remover item
+// - aoEditar: função para carregar dados no formulário (NOVO)
 // - podeEditar: controla se mostra ações (permissão)
-export default function TabelaEstoque({ materiais, aoRemover, podeEditar }) {
+export default function TabelaEstoque({ materiais, aoRemover, aoEditar, podeEditar }) {
 
   // Estado para controlar qual QR Code está aberto
   const [qrVisivel, setQrVisivel] = useState(null);
 
   // Função para formatar valor monetário
   const formatarValor = (valor) => {
-    // Se valor for null ou undefined → mostra traço
     if (valor == null) return '—';
-
-    // Formata para padrão brasileiro (ex: 1.234,56)
     return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
   };
 
   return (
     <table>
-
       {/* Cabeçalho */}
       <thead>
         <tr>
@@ -30,46 +27,34 @@ export default function TabelaEstoque({ materiais, aoRemover, podeEditar }) {
           <th>Categoria</th>
           <th>Local</th>
           <th>Valor</th>
-
           {/* Só mostra coluna de ações se tiver permissão */}
           {podeEditar && <th style={{ textAlign: 'center' }}>Ações</th>}
         </tr>
       </thead>
 
       <tbody>
-
         {/* Se não tiver itens */}
         {materiais.length === 0 ? (
           <tr>
             <td 
-              colSpan={podeEditar ? 6 : 5} // ajusta colunas dinamicamente
+              colSpan={podeEditar ? 6 : 5} 
               style={{ textAlign: 'center', padding: '20px', color: '#999' }}
             >
               Nenhum patrimônio encontrado.
             </td>
           </tr>
-
         ) : (
-
           // Renderiza cada item
           materiais.map(item => {
-
-            // Aqui está redundante (vou comentar abaixo)
-            const permitirAcao = podeEditar;
-
             return (
               <tr key={item.id}>
-
                 {/* Imagem */}
                 <td>
                   {item.imagemUrl ? (
                     <img 
                       src={item.imagemUrl}
                       alt={item.nome}
-
-                      // Se der erro na imagem, troca por placeholder
                       onError={(e) => e.target.src = 'https://via.placeholder.com/50'}
-
                       style={{ 
                         width: '50px',
                         height: '50px',
@@ -85,7 +70,6 @@ export default function TabelaEstoque({ materiais, aoRemover, podeEditar }) {
                   <div style={{ fontWeight: '600', color: '#1a73e8' }}>
                     {item.nome || 'Sem nome'}
                   </div>
-
                   <div style={{ 
                     fontSize: '12px', 
                     color: '#5f6368', 
@@ -106,7 +90,6 @@ export default function TabelaEstoque({ materiais, aoRemover, podeEditar }) {
                     fontWeight: 'bold',
                     textTransform: 'uppercase'
                   }}>
-                    {/* optional chaining evita erro se categoria for null */}
                     {item.categoria?.nome || '—'}
                   </span>
                 </td>
@@ -125,7 +108,24 @@ export default function TabelaEstoque({ materiais, aoRemover, podeEditar }) {
                 {podeEditar && (
                   <td style={{ textAlign: 'center', position: 'relative' }}>
                     
-                    {/* BOTÃO QR CODE (Adicionado para Entrega 2) */}
+                    {/* BOTÃO EDITAR (Adicionado para funcionar com o Form) */}
+                    <button 
+                      onClick={() => aoEditar(item)}
+                      style={{ 
+                        padding: '5px 10px', 
+                        fontSize: '12px', 
+                        marginRight: '5px',
+                        backgroundColor: '#fff3cd',
+                        border: '1px solid #ffeeba',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        color: '#856404'
+                      }}
+                    >
+                      ✏️ Editar
+                    </button>
+
+                    {/* BOTÃO QR CODE */}
                     <button 
                       onClick={() => setQrVisivel(qrVisivel === item.id ? null : item.id)}
                       style={{ 
@@ -165,17 +165,13 @@ export default function TabelaEstoque({ materiais, aoRemover, podeEditar }) {
 
                     <button 
                       className="btn btn-danger" 
-
-                      // Chama função do componente pai
                       onClick={() => aoRemover(item.id)}
-
                       style={{ padding: '5px 10px', fontSize: '12px' }}
                     >
                       Dar Baixa
                     </button>
                   </td>
                 )}
-
               </tr>
             );
           })

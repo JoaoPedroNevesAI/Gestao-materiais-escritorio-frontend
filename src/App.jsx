@@ -5,17 +5,15 @@ import Login from './components/Login';
 import ListaAcessos from './components/ListaAcessos';
 import Auditoria from './components/Auditoria'; 
 import { ToastContainer, toast } from 'react-toastify';
-import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias } from './services/api';
+import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial } from './services/api'; // Adicionei atualizarMaterial
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
-  // 1. ESTADO DE LOGIN COM PERSISTÊNCIA
   const [usuarioLogado, setUsuarioLogado] = useState(() => {
     const salvo = localStorage.getItem('usuario_patrimonio');
     return salvo ? JSON.parse(salvo) : null;
   });
 
-  // Novos estados para Dark Mode e filtros
   const [darkMode, setDarkMode] = useState(false);
   const [bens, setBens] = useState([]);
   const [busca, setBusca] = useState('');
@@ -23,6 +21,9 @@ function App() {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroLocal, setFiltroLocal] = useState('');
   const [categorias, setCategorias] = useState([]);
+  
+  // NOVO: Estado para controlar o item que está sendo editado
+  const [itemParaEditar, setItemParaEditar] = useState(null);
 
   useEffect(() => {
     if (usuarioLogado) {
@@ -47,15 +48,30 @@ function App() {
     toast.info("Sessão encerrada.");
   };
 
-  const aoAdicionarBemNoBanco = async (material) => {
+  // FUNÇÃO UNIFICADA: Salva novo ou atualiza existente
+  const salvarOuAtualizarBem = async (dadosMaterial) => {
     try {
-      const materialComUsuario = { ...material, cadastradoPor: usuarioLogado.nome };
-      const novo = await salvarMaterial(materialComUsuario);
-      setBens(prev => [...prev, novo]);
-      toast.success(`Sucesso: ${novo.nome} registrado!`);
+      if (itemParaEditar) {
+        // Modo Edição
+        const atualizado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
+        setBens(bens.map(b => b.id === itemParaEditar.id ? atualizado : b));
+        toast.success("Patrimônio atualizado com sucesso!");
+        setItemParaEditar(null); // Limpa o estado de edição
+      } else {
+        // Modo Cadastro
+        const materialComUsuario = { ...dadosMaterial, cadastradoPor: usuarioLogado.nome };
+        const novo = await salvarMaterial(materialComUsuario);
+        setBens(prev => [...prev, novo]);
+        toast.success(`Sucesso: ${novo.nome} registrado!`);
+      }
     } catch (err) {
-      toast.error("Erro ao salvar no servidor.");
+      toast.error("Erro ao processar solicitação no servidor.");
     }
+  };
+
+  const prepararEdicao = (item) => {
+    setItemParaEditar(item);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Sobe para o formulário
   };
 
   const removerBem = async (id) => {
@@ -87,7 +103,6 @@ function App() {
     );
   }
 
-  // Definição de cores para o Dark Mode
   const themeStyles = {
     backgroundColor: darkMode ? '#121212' : '#f8f9fa',
     color: darkMode ? '#e0e0e0' : '#333',
@@ -123,7 +138,6 @@ function App() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              {/* Toggle Dark Mode */}
               <button 
                 onClick={() => setDarkMode(!darkMode)}
                 style={{ 
@@ -199,7 +213,13 @@ function App() {
 
         {abaAtiva === 'estoque' ? (
           <>
-            <Formulario aoAdicionar={aoAdicionarBemNoBanco} darkMode={darkMode} />
+            {/* NOVO: Passei itemParaEditar e setItemParaEditar para o Formulario */}
+            <Formulario 
+              aoAdicionar={salvarOuAtualizarBem} 
+              itemParaEditar={itemParaEditar} 
+              cancelarEdicao={() => setItemParaEditar(null)}
+              darkMode={darkMode} 
+            />
             
             <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -247,7 +267,13 @@ function App() {
                 </select>
               </div>
 
-              <TabelaEstoque materiais={materiaisFiltrados} aoRemover={removerBem} podeEditar={true} darkMode={darkMode} />
+              {/* NOVO: Passei prepararEdicao para a tabela */}
+              <TabelaEstoque 
+                materiais={materiaisFiltrados} 
+                aoRemover={removerBem} 
+                aoEditar={prepararEdicao} 
+                darkMode={darkMode} 
+              />
             </div>
           </>
         ) : (
@@ -255,7 +281,6 @@ function App() {
         )}
       </div>
 
-      {/* BARRA LATERAL (FIXA) */}
       {usuarioLogado.cargo === 'ADM' && (
         <div style={{ 
           width: '300px', 
