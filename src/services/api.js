@@ -60,4 +60,14 @@ export const salvarUsuario = async (dados) => {
   }
 };
 
+export const atualizarMaterial = async (id, dados) => {
+  try {
+    const response = await api.put(`/material/${id}`, dados);
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao atualizar material:", error.response || error);
+    throw error;
+  }
+};
+
 export default api;

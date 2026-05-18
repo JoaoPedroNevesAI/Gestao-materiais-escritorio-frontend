@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'; // Lembra de rodar: npm install qrcode
 // Componente recebe:
 // - materiais: lista de itens do estoque
 // - aoRemover: função para remover item
-// - aoEditar: função para carregar dados no formulário (NOVO)
+// - aoEditar: função para carregar dados no formulário
 // - podeEditar: controla se mostra ações (permissão)
 export default function TabelaEstoque({ materiais, aoRemover, aoEditar, podeEditar }) {
 
@@ -106,47 +106,65 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, podeEdit
 
                 {/* Ações */}
                 {podeEditar && (
-                  <td style={{ textAlign: 'center', position: 'relative' }}>
+                  <td style={{ textAlign: 'center', position: 'relative', padding: '10px' }}>
                     
-                    {/* BOTÃO EDITAR (Adicionado para funcionar com o Form) */}
-                    <button 
-                      onClick={() => aoEditar(item)}
-                      style={{ 
-                        padding: '5px 10px', 
-                        fontSize: '12px', 
-                        marginRight: '5px',
-                        backgroundColor: '#fff3cd',
-                        border: '1px solid #ffeeba',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        color: '#856404'
-                      }}
-                    >
-                      ✏️ Editar
-                    </button>
+                    {/* Container Flex em Coluna para empilhar os botões certinho */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                      
+                      {/* 1º: BOTÃO QR CODE */}
+                      <button 
+                        onClick={() => setQrVisivel(qrVisivel === item.id ? null : item.id)}
+                        style={{ 
+                          padding: '5px 10px', 
+                          fontSize: '12px', 
+                          backgroundColor: '#f8f9fa',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          width: '95px'
+                        }}
+                      >
+                        🖼️ QR
+                      </button>
 
-                    {/* BOTÃO QR CODE */}
-                    <button 
-                      onClick={() => setQrVisivel(qrVisivel === item.id ? null : item.id)}
-                      style={{ 
-                        padding: '5px 10px', 
-                        fontSize: '12px', 
-                        marginRight: '5px',
-                        backgroundColor: '#f8f9fa',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      🖼️ QR
-                    </button>
+                      {/* 2º: BOTÃO DAR BAIXA */}
+                      <button 
+                        className="btn btn-danger" 
+                        onClick={() => aoRemover(item.id)}
+                        style={{ 
+                          padding: '5px 10px', 
+                          fontSize: '12px',
+                          width: '95px' 
+                        }}
+                      >
+                        Dar Baixa
+                      </button>
+
+                      {/* 3º: BOTÃO EDITAR (Posicionado embaixo do Dar Baixa) */}
+                      <button 
+                        onClick={() => aoEditar(item)}
+                        style={{ 
+                          padding: '5px 10px', 
+                          fontSize: '12px', 
+                          backgroundColor: '#fff3cd',
+                          border: '1px solid #ffeeba',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          color: '#856404',
+                          width: '95px'
+                        }}
+                      >
+                        ✏️ Editar
+                      </button>
+
+                    </div>
 
                     {/* Janela flutuante do QR Code */}
                     {qrVisivel === item.id && (
                       <div style={{ 
                         position: 'absolute', 
-                        bottom: '40px', 
-                        right: '50%', 
+                        bottom: '50px', 
+                        right: '55%', 
                         transform: 'translateX(50%)',
                         zIndex: 100, 
                         background: 'white', 
@@ -163,13 +181,6 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, podeEdit
                       </div>
                     )}
 
-                    <button 
-                      className="btn btn-danger" 
-                      onClick={() => aoRemover(item.id)}
-                      style={{ padding: '5px 10px', fontSize: '12px' }}
-                    >
-                      Dar Baixa
-                    </button>
                   </td>
                 )}
               </tr>
