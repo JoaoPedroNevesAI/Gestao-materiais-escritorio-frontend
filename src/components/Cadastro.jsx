@@ -4,6 +4,9 @@ import React, { useState } from 'react';
 // Importa o toast para mostrar mensagens na tela (sucesso/erro)
 import { toast } from 'react-toastify';
 
+// Importa a função real de cadastro da API
+import { salvarUsuario } from '../services/api';
+
 // Componente principal de cadastro de usuário
 // Recebe uma função "aoFinalizar" como prop (ex: voltar pro login)
 export default function CadastroUsuario({ aoFinalizar }) {
@@ -22,36 +25,32 @@ export default function CadastroUsuario({ aoFinalizar }) {
     // Converte FormData em objeto JS comum
     const dadosForm = Object.fromEntries(fd);
 
-    // Monta o objeto do novo usuário
+    // Monta o objeto mapeado exatamente como o Java espera
     const novoUsuario = {
       nome: dadosForm.nome,
       email: dadosForm.email,
       senha: dadosForm.senha,
-      tipo: dadosForm.tipo 
+      tipo: dadosForm.tipo // Vai enviar "ADM" ou "CLIENTE"
     };
 
     try {
-      // Faz requisição para o backend (API)
-      const response = await fetch('http://localhost:8080/api/usuarios', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(novoUsuario), // Envia dados em JSON
-      });
+      // Faz a requisição usando nossa api configurada (POST /api/usuario)
+      await salvarUsuario(novoUsuario);
 
-      // Se deu certo (status 200-299)
-      if (response.ok) {
-        toast.success("Usuário criado com sucesso!");
+      toast.success("Usuário criado com sucesso!");
 
-        // Se existir função aoFinalizar, chama ela (ex: voltar tela)
-        if (aoFinalizar) aoFinalizar(); 
-      } else {
-        // Se o backend respondeu erro (ex: email já existe)
-        toast.error("Erro ao cadastrar: Verifique os dados ou se o e-mail já existe.");
-      }
+      // Se existir função aoFinalizar, chama ela para voltar à tela de login
+      if (aoFinalizar) aoFinalizar(); 
 
     } catch (error) {
-      // Se não conseguiu conectar com o servidor
-      toast.error("Erro de conexão com o servidor.");
+      console.error("Erro ao cadastrar usuário:", error);
+      
+      // Trata a resposta de erro do backend
+      if (error.response && error.response.status === 400) {
+        toast.error("Erro ao cadastrar: Verifique se o e-mail já está em uso.");
+      } else {
+        toast.error("Erro de conexão com o servidor. O backend está rodando?");
+      }
     } finally {
       // Sempre executa no final (sucesso ou erro)
       setLoading(false); // Desativa loading
@@ -101,7 +100,7 @@ export default function CadastroUsuario({ aoFinalizar }) {
             <input 
               name="email" 
               type="email" 
-              placeholder="email@ifes.edu.br" 
+              placeholder="email@ifes.com" 
               required 
             />
           </div>
@@ -117,14 +116,13 @@ export default function CadastroUsuario({ aoFinalizar }) {
             />
           </div>
 
-          {/* Select de tipo de usuário */}
+          {/* Select de tipo de usuário alinhado com o Backend (ADM ou CLIENTE) */}
           <div style={{ display: 'grid', gap: '5px' }}>
             <label>Tipo de Acesso</label>
             <select name="tipo" required>
               <option value="">Selecione o cargo...</option>
-              <option value="ADMINISTRADOR">Administrador (Total)</option>
-              <option value="OPERADOR">Operador (Cadastro)</option>
-              <option value="VISUALIZADOR">Visualizador (Apenas consulta)</option>
+              <option value="ADM">Administrador (Total)</option>
+              <option value="CLIENTE">Cliente (Apenas consulta)</option>
             </select>
           </div>
 

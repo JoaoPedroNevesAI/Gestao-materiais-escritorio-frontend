@@ -1,52 +1,59 @@
-// Hook de estado
 import { useState } from 'react';
-
-// Toast pra feedback (mensagens)
 import { toast } from 'react-toastify';
-
-// Componente de cadastro (tela alternativa)
+import { realizarLogin } from '../services/api';
 import CadastroUsuario from './Cadastro';
 
 // Componente principal de Login
 export default function Login({ aoLogar }) {
 
-  // Estado do campo usuário
-  const [usuario, setUsuario] = useState('');
+  // Estado do campo usuário (que o back espera como email)
+  const [email, setEmail] = useState('');
 
   // Estado do campo senha
   const [senha, setSenha] = useState('');
 
+  // Controla o estado de carregamento do botão
+  const [carregando, setCarregando] = useState(false);
+
   // Controla se mostra login ou cadastro
   const [mostrandoCadastro, setMostrandoCadastro] = useState(false);
 
-  // Função ao enviar formulário
-  const handleSubmit = (e) => {
+  // Função ao enviar formulário integrado ao backend
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setCarregando(true);
 
-    // Simulação de autenticação (hardcoded)
-    if ((usuario === 'admin' || usuario === 'gerente') && senha === '123') {
+    try {
+      // Faz a requisição real para o Spring Boot
+      const dados = await realizarLogin(email, senha);
 
-      toast.success(`Bem-vindo, ${usuario}! Acesso total autorizado.`);
+      // Salva o token JWT no navegador para as próximas requisições
+      localStorage.setItem('token', dados.token);
 
-      // Envia dados pro componente pai (provavelmente salva sessão)
-      aoLogar({ nome: usuario, cargo: 'ADM' });
+      // Envia os dados corretos vindo do Java para o App.jsx
+      aoLogar({ 
+        nome: dados.nome, 
+        role: dados.role // ROLE_ADM ou ROLE_CLIENTE
+      });
 
-    } else if (usuario === 'user' && senha === '123') {
-
-      toast.info("Acesso autorizado: Modo de Visualização.");
-
-      aoLogar({ nome: 'Colaborador', cargo: 'VISUALIZADOR' });
-
-    } else {
-      // Credenciais inválidas
-      toast.error("Credenciais inválidas. Verifique usuário e senha.");
+      toast.success(`Bem-vindo, ${dados.nome}!`);
+    } catch (error) {
+      console.error("Erro na autenticação:", error);
+      
+      // Trata erros de credenciais inválidas ou queda de servidor
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        toast.error("Credenciais inválidas. Verifique seu e-mail e senha.");
+      } else {
+        toast.error("Erro ao conectar com o servidor. O backend está rodando?");
+      }
+    } finally {
+      setCarregando(false);
     }
   };
 
   // Função "esqueci senha" (simulada)
   const manipularEsqueciSenha = (e) => {
     e.preventDefault();
-
     toast.info("🔒 Serviço de recuperação indisponível: contate o suporte de TI local.");
   };
 
@@ -84,14 +91,14 @@ export default function Login({ aoLogar }) {
         {/* Formulário */}
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
           
-          {/* Usuário */}
+          {/* E-mail */}
           <div style={{ display: 'grid', gap: '8px' }}>
-            <label>Usuário</label>
+            <label>E-mail institucional</label>
             <input 
-              type="text" 
-              value={usuario} // controlado
-              onChange={(e) => setUsuario(e.target.value)}
-              placeholder="admin, gerente ou user"
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="exemplo@ifes.com"
               required 
             />
           </div>
@@ -101,7 +108,7 @@ export default function Login({ aoLogar }) {
             <label>Senha</label>
             <input 
               type="password" 
-              value={senha} // controlado
+              value={senha}
               onChange={(e) => setSenha(e.target.value)}
               placeholder="Digite sua senha"
               required 
@@ -113,8 +120,9 @@ export default function Login({ aoLogar }) {
             type="submit" 
             className="btn btn-primary" 
             style={{ padding: '12px', fontSize: '16px' }}
+            disabled={carregando}
           >
-            Entrar no Sistema
+            {carregando ? 'Autenticando...' : 'Entrar no Sistema'}
           </button>
         </form>
 

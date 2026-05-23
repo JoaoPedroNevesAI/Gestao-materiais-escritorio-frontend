@@ -1,21 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { listarUsuarios } from '../services/api'; // Importando a chamada real do backend
 
-export default function ListaAcessos({ darkMode }) { // Recebe a prop aqui
+export default function ListaAcessos({ darkMode }) {
 
   const [email, setEmail] = useState('');
-  const [usuarios, setUsuarios] = useState([
-    { id: 1, nome: 'João Backend', online: true },
-    { id: 2, nome: 'Maria Supervisor', online: false },
-  ]);
+  const [usuarios, setUsuarios] = useState([]);
 
-  // Estilos dinâmicos baseados no tema
+  // Carrega os usuários reais cadastrados no banco Spring Boot ao iniciar
+  useEffect(() => {
+    listarUsuarios()
+      .then(dados => {
+        // Mapeia os dados do Java e atribui um status visual dinâmico baseado na Role
+        const usuariosMapeados = dados.map(user => ({
+          id: user.id,
+          nome: user.nome,
+          online: user.tipo === 'ADM' || user.role === 'ROLE_ADM' // Exemplo visual: ADMs aparecem online
+        }));
+        setUsuarios(usuariosMapeados);
+      })
+      .catch(err => {
+        console.error("Erro ao carregar lista de acessos:", err);
+      });
+  }, []);
+
+  // Estilos dinâmicos baseados no tema (Mantive seu design perfeito)
   const styles = {
     container: {
       padding: '20px', 
       borderLeft: `1px solid ${darkMode ? '#333' : '#ddd'}`, 
       height: '100%', 
-      backgroundColor: darkMode ? '#1e1e1e' : '#fff', // Corrigido!
+      backgroundColor: darkMode ? '#1e1e1e' : '#fff',
       color: darkMode ? '#e0e0e0' : '#333',
       transition: 'all 0.2s'
     },
@@ -42,7 +57,8 @@ export default function ListaAcessos({ darkMode }) { // Recebe a prop aqui
   const adicionarAcesso = (e) => {
     e.preventDefault();
     if (!email) return;
-    toast.info(`Convite enviado para ${email}. Aguardando integração...`);
+    // Feedback de convite simulando as futuras integrações por e-mail institucional
+    toast.info(`Convite enviado para ${email}. Aguardando aceitação...`);
     setEmail('');
   };
 
@@ -59,14 +75,14 @@ export default function ListaAcessos({ darkMode }) { // Recebe a prop aqui
           gap: '10px',
           fontSize: '16px'
         }}>
-           👥 Contatos / Acessos
+           👥 Usuários / Contatos
         </h4>
 
         {/* Formulário */}
         <form onSubmit={adicionarAcesso} style={{ marginBottom: '25px' }}>
           <input 
             type="email" 
-            placeholder="E-mail do novo visualizador" 
+            placeholder="Convidar novo e-mail..." 
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             style={styles.input}
@@ -87,14 +103,14 @@ export default function ListaAcessos({ darkMode }) { // Recebe a prop aqui
               color: '#fff'
             }}
           >
-            + Adicionar
+            + Convidar
           </button>
         </form>
 
-        {/* Lista de usuários */}
+        {/* Lista de usuários vindos do Java */}
         <ul style={{ listStyle: 'none', padding: 0 }}>
           <li style={styles.labelLista}>
-            Amigos (Visualizadores)
+            Integrantes do Sistema ({usuarios.length})
           </li>
 
           {usuarios.map(user => (
@@ -107,7 +123,7 @@ export default function ListaAcessos({ darkMode }) { // Recebe a prop aqui
                 marginBottom: '15px' 
               }}
             >
-              {/* Bolinha de status */}
+              {/* Bolinha de status estilo LoL */}
               <div style={{ 
                 width: '10px', 
                 height: '10px', 
@@ -117,7 +133,7 @@ export default function ListaAcessos({ darkMode }) { // Recebe a prop aqui
                 boxShadow: '0 0 3px rgba(0,0,0,0.3)'
               }} />
 
-              {/* Nome do usuário */}
+              {/* Nome do usuário real */}
               <span style={{ 
                 fontSize: '14px', 
                 fontWeight: '500',

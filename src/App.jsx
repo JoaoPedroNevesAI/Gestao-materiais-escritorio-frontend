@@ -5,7 +5,7 @@ import Login from './components/Login';
 import ListaAcessos from './components/ListaAcessos';
 import Auditoria from './components/Auditoria'; 
 import { ToastContainer, toast } from 'react-toastify';
-import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial } from './services/api'; // Adicionei atualizarMaterial
+import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
@@ -21,8 +21,6 @@ function App() {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroLocal, setFiltroLocal] = useState('');
   const [categorias, setCategorias] = useState([]);
-  
-  // NOVO: Estado para controlar o item que está sendo editado
   const [itemParaEditar, setItemParaEditar] = useState(null);
 
   useEffect(() => {
@@ -45,10 +43,10 @@ function App() {
   const handleLogout = () => {
     setUsuarioLogado(null);
     localStorage.removeItem('usuario_patrimonio');
+    localStorage.removeItem('token'); // Limpa o token JWT por segurança
     toast.info("Sessão encerrada.");
   };
 
-  // FUNÇÃO UNIFICADA: Salva novo ou atualiza existente
   const salvarOuAtualizarBem = async (dadosMaterial) => {
     try {
       if (itemParaEditar) {
@@ -56,7 +54,7 @@ function App() {
         const atualizado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
         setBens(bens.map(b => b.id === itemParaEditar.id ? atualizado : b));
         toast.success("Patrimônio atualizado com sucesso!");
-        setItemParaEditar(null); // Limpa o estado de edição
+        setItemParaEditar(null);
       } else {
         // Modo Cadastro
         const materialComUsuario = { ...dadosMaterial, cadastradoPor: usuarioLogado.nome };
@@ -71,7 +69,7 @@ function App() {
 
   const prepararEdicao = (item) => {
     setItemParaEditar(item);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Sobe para o formulário
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const removerBem = async (id) => {
@@ -86,11 +84,17 @@ function App() {
     }
   };
 
+  // Filtros ajustados conforme a resposta de objetos do Java
   const materiaisFiltrados = bens.filter(b => {
     const matchBusca = b.nome?.toLowerCase().includes(busca.toLowerCase()) ||
                        b.descricao?.toLowerCase().includes(busca.toLowerCase());
-    const matchCategoria = filtroCategoria === '' || b.categoriaId === parseInt(filtroCategoria);
-    const matchLocal = filtroLocal === '' || b.localId === parseInt(filtroLocal);
+    
+    // Alinhado para ler b.categoria.id vindo do Spring Boot
+    const matchCategoria = filtroCategoria === '' || b.categoria?.id === parseInt(filtroCategoria);
+    
+    // Mantido o filtro de local (verifique se o back manda local como id ou string dps)
+    const matchLocal = filtroLocal === '' || b.local === filtroLocal || b.localId === parseInt(filtroLocal);
+    
     return matchBusca && matchCategoria && matchLocal;
   });
 
@@ -194,7 +198,8 @@ function App() {
               📦 Inventário
             </button>
             
-            {usuarioLogado.cargo === 'ADM' && (
+            {/* Trava corrigida de cargo -> role para o menu do ADM */}
+            {usuarioLogado.role === 'ROLE_ADM' && (
               <button 
                 onClick={() => setAbaAtiva('logs')}
                 style={{ 
@@ -213,13 +218,15 @@ function App() {
 
         {abaAtiva === 'estoque' ? (
           <>
-            {/* NOVO: Passei itemParaEditar e setItemParaEditar para o Formulario */}
-            <Formulario 
-              aoAdicionar={salvarOuAtualizarBem} 
-              itemParaEditar={itemParaEditar} 
-              cancelarEdicao={() => setItemParaEditar(null)}
-              darkMode={darkMode} 
-            />
+            {/* Trava de renderização para o Formulário: apenas ADM pode cadastrar ou editar */}
+            {usuarioLogado.role === 'ROLE_ADM' && (
+              <Formulario 
+                aoAdicionar={salvarOuAtualizarBem} 
+                itemParaEditar={itemParaEditar} 
+                cancelarEdicao={() => setItemParaEditar(null)}
+                darkMode={darkMode} 
+              />
+            )}
             
             <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -261,18 +268,18 @@ function App() {
                   }}
                 >
                   <option value="">Todos os Locais</option>
-                  <option value="1">Recepção</option>
-                  <option value="2">Escritório</option>
-                  <option value="3">TI</option>
+                  <option value="TI">TI</option>
+                  <option value="Escritório">Escritório</option>
+                  <option value="Recepção">Recepção</option>
                 </select>
               </div>
 
-              {/* NOVO: Passei prepararEdicao para a tabela */}
               <TabelaEstoque 
                 materiais={materiaisFiltrados} 
                 aoRemover={removerBem} 
                 aoEditar={prepararEdicao} 
                 darkMode={darkMode} 
+                usuarioLogado={usuarioLogado} // Passado para ocultar os botões se for CLIENTE
               />
             </div>
           </>
@@ -281,7 +288,8 @@ function App() {
         )}
       </div>
 
-      {usuarioLogado.cargo === 'ADM' && (
+      {/* Trava corrigida de cargo -> role para a Lista do LoL */}
+      {usuarioLogado.role === 'ROLE_ADM' && (
         <div style={{ 
           width: '300px', 
           position: 'sticky', 
