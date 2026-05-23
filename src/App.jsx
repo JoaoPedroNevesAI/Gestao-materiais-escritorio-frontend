@@ -3,7 +3,6 @@ import Formulario from './components/Formulario';
 import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
 import ListaAcessos from './components/ListaAcessos';
-import Auditoria from './components/Auditoria'; 
 import { ToastContainer, toast } from 'react-toastify';
 import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
@@ -17,7 +16,6 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [bens, setBens] = useState([]);
   const [busca, setBusca] = useState('');
-  const [abaAtiva, setAbaAtiva] = useState('estoque'); 
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroLocal, setFiltroLocal] = useState('');
   const [categorias, setCategorias] = useState([]);
@@ -92,7 +90,7 @@ function App() {
     // Alinhado para ler b.categoria.id vindo do Spring Boot
     const matchCategoria = filtroCategoria === '' || b.categoria?.id === parseInt(filtroCategoria);
     
-    // Mantido o filtro de local (verifique se o back manda local como id ou string dps)
+    // Mantido o filtro de local 
     const matchLocal = filtroLocal === '' || b.local === filtroLocal || b.localId === parseInt(filtroLocal);
     
     return matchBusca && matchCategoria && matchLocal;
@@ -186,109 +184,87 @@ function App() {
 
           <nav style={{ marginTop: '20px', borderBottom: `1px solid ${themeStyles.borderColor}` }}>
             <button 
-              onClick={() => setAbaAtiva('estoque')}
               style={{ 
                 padding: '10px 20px', border: 'none', 
-                background: abaAtiva === 'estoque' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
-                color: abaAtiva === 'estoque' ? '#1a73e8' : (darkMode ? '#aaa' : '#5f6368'), 
+                background: darkMode ? '#1a73e833' : '#e8f0fe', 
+                color: '#1a73e8', 
                 cursor: 'pointer', fontWeight: 'bold',
-                borderBottom: abaAtiva === 'estoque' ? '3px solid #1a73e8' : 'none'
+                borderBottom: '3px solid #1a73e8'
               }}
             >
               📦 Inventário
             </button>
-            
-            {/* Trava corrigida de cargo -> role para o menu do ADM */}
-            {usuarioLogado.role === 'ROLE_ADM' && (
-              <button 
-                onClick={() => setAbaAtiva('logs')}
-                style={{ 
-                  padding: '10px 20px', border: 'none', 
-                  background: abaAtiva === 'logs' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
-                  color: abaAtiva === 'logs' ? '#1a73e8' : (darkMode ? '#aaa' : '#5f6368'), 
-                  cursor: 'pointer', fontWeight: 'bold',
-                  borderBottom: abaAtiva === 'logs' ? '3px solid #1a73e8' : 'none'
-                }}
-              >
-                📜 Auditoria
-              </button>
-            )}
           </nav>
         </header>
 
-        {abaAtiva === 'estoque' ? (
-          <>
-            {/* Trava de renderização para o Formulário: apenas ADM pode cadastrar ou editar */}
-            {usuarioLogado.role === 'ROLE_ADM' && (
-              <Formulario 
-                aoAdicionar={salvarOuAtualizarBem} 
-                itemParaEditar={itemParaEditar} 
-                cancelarEdicao={() => setItemParaEditar(null)}
-                darkMode={darkMode} 
+        {/* Renderiza diretamente os componentes principais do Inventário */}
+        <>
+          {usuarioLogado.role === 'ROLE_ADM' && (
+            <Formulario 
+              aoAdicionar={salvarOuAtualizarBem} 
+              bemParaEditar={itemParaEditar} 
+              cancelarEdicao={() => setItemParaEditar(null)}
+              darkMode={darkMode} 
+            />
+          )}
+          
+          <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <input
+                type="text"
+                placeholder="Buscar por nome ou descrição..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                style={{ 
+                  flex: 2, padding: '10px', borderRadius: '8px', 
+                  border: `1px solid ${themeStyles.borderColor}`,
+                  backgroundColor: themeStyles.inputBg,
+                  color: themeStyles.color
+                }}
               />
-            )}
-            
-            <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <input
-                  type="text"
-                  placeholder="Buscar por nome ou descrição..."
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  style={{ 
-                    flex: 2, padding: '10px', borderRadius: '8px', 
-                    border: `1px solid ${themeStyles.borderColor}`,
-                    backgroundColor: themeStyles.inputBg,
-                    color: themeStyles.color
-                  }}
-                />
-                
-                <select 
-                  value={filtroCategoria} 
-                  onChange={(e) => setFiltroCategoria(e.target.value)}
-                  style={{ 
-                    flex: 1, padding: '10px', borderRadius: '8px', 
-                    border: `1px solid ${themeStyles.borderColor}`,
-                    backgroundColor: themeStyles.inputBg,
-                    color: themeStyles.color
-                  }}
-                >
-                  <option value="">Todas Categorias</option>
-                  {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
+              
+              <select 
+                value={filtroCategoria} 
+                onChange={(e) => setFiltroCategoria(e.target.value)}
+                style={{ 
+                  flex: 1, padding: '10px', borderRadius: '8px', 
+                  border: `1px solid ${themeStyles.borderColor}`,
+                  backgroundColor: themeStyles.inputBg,
+                  color: themeStyles.color
+                }}
+              >
+                <option value="">Todas Categorias</option>
+                {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
 
-                <select 
-                  value={filtroLocal} 
-                  onChange={(e) => setFiltroLocal(e.target.value)}
-                  style={{ 
-                    flex: 1, padding: '10px', borderRadius: '8px', 
-                    border: `1px solid ${themeStyles.borderColor}`,
-                    backgroundColor: themeStyles.inputBg,
-                    color: themeStyles.color
-                  }}
-                >
-                  <option value="">Todos os Locais</option>
-                  <option value="TI">TI</option>
-                  <option value="Escritório">Escritório</option>
-                  <option value="Recepção">Recepção</option>
-                </select>
-              </div>
-
-              <TabelaEstoque 
-                materiais={materiaisFiltrados} 
-                aoRemover={removerBem} 
-                aoEditar={prepararEdicao} 
-                darkMode={darkMode} 
-                usuarioLogado={usuarioLogado} // Passado para ocultar os botões se for CLIENTE
-              />
+              <select 
+                value={filtroLocal} 
+                onChange={(e) => setFiltroLocal(e.target.value)}
+                style={{ 
+                  flex: 1, padding: '10px', borderRadius: '8px', 
+                  border: `1px solid ${themeStyles.borderColor}`,
+                  backgroundColor: themeStyles.inputBg,
+                  color: themeStyles.color
+                }}
+              >
+                <option value="">Todos os Locais</option>
+                <option value="TI">TI</option>
+                <option value="ESCR">Escritório</option>
+                <option value="RECP">Recepção</option>
+              </select>
             </div>
-          </>
-        ) : (
-          <Auditoria darkMode={darkMode} />
-        )}
+
+            <TabelaEstoque 
+              materiais={materiaisFiltrados} 
+              aoRemover={removerBem} 
+              aoEditar={prepararEdicao} 
+              darkMode={darkMode} 
+              usuarioLogado={usuarioLogado} 
+            />
+          </div>
+        </>
       </div>
 
-      {/* Trava corrigida de cargo -> role para a Lista do LoL */}
       {usuarioLogado.role === 'ROLE_ADM' && (
         <div style={{ 
           width: '300px', 

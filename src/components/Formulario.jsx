@@ -68,18 +68,18 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Remonta o objeto no formato exato que as entidades JPA e Controllers do Spring esperam
+    // CORRIGIDO: Remonta o objeto no formato exato que as entidades JPA e Controllers do Spring esperam
     const materialFormatado = {
       id: bemParaEditar?.id || null, // Garante o ID original se for uma edição
       nome: formData.nome,
       descricao: formData.descricao,
       quantidade: parseInt(formData.quantidade) || 0,
-      valor: formData.valor ? parseFloat(formData.valor) : null,
+      valor: formData.valor ? parseFloat(formData.valor) : 0.0, // Evita passar null para Double/BigDecimal no Java
       local: formData.local || null,
       imagemUrl: formData.imagemUrl || '',
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
-      // O segredo do relacionamento ManyToOne do Spring Boot: passar o sub-objeto com ID
+      // O SEGREDO DO SPRING BOOT: passar o sub-objeto estruturado com o ID correto da categoria
       categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null
     };
 
@@ -232,7 +232,6 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
               src={formData.imagemUrl} 
               alt="Preview" 
               onError={(e) => e.target.style.display = 'none'}
-              onLoad={(e) => e.target.style.display = 'inline-block'}
               style={{ width: '120px', maxHeight: '120px', objectFit: 'cover', borderRadius: '8px', border: `1px solid ${darkMode ? '#444' : '#eee'}` }} 
             />
           </div>

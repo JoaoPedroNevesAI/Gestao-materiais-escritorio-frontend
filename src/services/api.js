@@ -17,9 +17,15 @@ api.interceptors.request.use((config) => {
 
 // --- AUTENTICAÇÃO ---
 export const realizarLogin = async (email, senha) => {
-  // Rota final: http://localhost:8080/api/auth/login
-  const response = await api.post('/auth/login', { email, senha });
-  return response.data; // Retorna { token, nome, role }
+  try {
+    // Rota final: http://localhost:8080/api/auth/login
+    const response = await api.post('/auth/login', { email, senha });
+    console.log('LOGIN RESPONSE:', response.data);
+    return response.data; // Retorna { token, nome, role }
+  } catch (error) {
+    console.error('Erro no login:', error.response || error);
+    throw error;
+  }
 };
 
 // --- MATERIAL ---
@@ -85,35 +91,33 @@ export const salvarUsuario = async (dados) => {
   }
 };
 
-// --- NOVA: LISTAR USUÁRIOS (Para a barra lateral de acessos) ---
+// --- LISTAR USUÁRIOS (Sincronizado com os nomes e roles da branch do João) ---
 export const listarUsuarios = async () => {
   try {
     const response = await api.get('/usuario');
     return response.data;
   } catch (error) {
     console.error("Erro ao listar usuários (Usando Mock temporário):", error.message);
-    // Retorna dados mocados para a interface renderizar mesmo sem o servidor Java ligado!
     return [
-      { id: 1, nome: 'Luiz (Você)', role: 'ROLE_ADM', tipo: 'ADM' },
-      { id: 2, nome: 'Lucas Coisinha', role: 'ROLE_USER', tipo: 'USER' },
-      { id: 3, nome: 'João Backend', role: 'ROLE_USER', tipo: 'USER' },
-      { id: 4, nome: 'Maria Supervisor', role: 'ROLE_USER', tipo: 'USER' }
+      { id: 1, nome: 'Administrador', role: 'ROLE_ADM', tipo: 'ADM' },
+      { id: 2, nome: 'Lucas Cliente', role: 'ROLE_CLIENTE', tipo: 'CLIENTE' },
+      { id: 3, nome: 'João Backend', role: 'ROLE_CLIENTE', tipo: 'CLIENTE' },
+      { id: 4, nome: 'Maria Supervisora', role: 'ROLE_CLIENTE', tipo: 'CLIENTE' }
     ];
   }
 };
 
-// --- NOVA: BUSCAR AUDITORIA (Para a tabela de logs) ---
+// --- BUSCAR AUDITORIA (Mantido aqui por segurança para compilar sem erros) ---
 export const buscarLogsAuditoria = async () => {
   try {
-    const response = await api.get('/auditoria'); // Altere a rota aqui se o endpoint no Spring for diferente (ex: /logs)
+    const response = await api.get('/auditoria');
     return response.data;
   } catch (error) {
     console.error("Erro ao buscar logs (Usando Mock temporário):", error.message);
-    // Evita crash na tela de auditoria quando o server está offline
     return [
-      { id: 1, usuario: 'Luiz', acao: 'CREATE', item: 'Monitor Dell 24"', data: new Date().toISOString() },
-      { id: 2, usuario: 'João Backend', acao: 'UPDATE', item: 'Cadeira Gamer', detalhe: 'Alterou valor', data: new Date().toISOString() },
-      { id: 3, usuario: 'Admin', acao: 'DELETE', item: 'Teclado Antigo Mecânico', data: new Date().toISOString() }
+      { id: 1, usuario: 'Administrador', acao: 'CREATE', item: 'Monitor Dell', data: new Date().toISOString() },
+      { id: 2, usuario: 'João Backend', acao: 'UPDATE', item: 'Cadeira Gamer', detalhe: 'Alterou localização', data: new Date().toISOString() },
+      { id: 3, usuario: 'Administrador', acao: 'DELETE', item: 'Teclado Antigo', data: new Date().toISOString() }
     ];
   }
 };
