@@ -4,8 +4,7 @@ import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
 import ListaAcessos from './components/ListaAcessos';
 import { ToastContainer, toast } from 'react-toastify';
-import { jwtDecode } from 'jwt-decode'; // Importando o decodificador de Token JWT
-// Importação atualizada incluindo o listarLocais
+import { jwtDecode } from 'jwt-decode'; 
 import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -21,7 +20,7 @@ function App() {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroLocal, setFiltroLocal] = useState('');
   const [categorias, setCategorias] = useState([]);
-  const [locais, setLocais] = useState([]); // Novo estado para carregar os locais dinamicamente no filtro
+  const [locais, setLocais] = useState([]); 
   const [itemParaEditar, setItemParaEditar] = useState(null);
 
   useEffect(() => {
@@ -34,14 +33,12 @@ function App() {
         .then(setCategorias)
         .catch(() => console.error("Erro ao carregar categorias."));
 
-      // Carrega os locais da API para alimentar o Select de Filtro
       listarLocais()
         .then(setLocais)
         .catch(() => console.error("Erro ao carregar locais."));
     }
   }, [usuarioLogado]);
 
-  // CORREÇÃO: Trata a resposta do login contendo apenas { token: "ey..." } do João
   const handleLogin = (dadosDoLogin) => {
     if (!dadosDoLogin || !dadosDoLogin.token) {
       toast.error("Erro na autenticação: Token não fornecido.");
@@ -49,25 +46,26 @@ function App() {
     }
 
     try {
-      // Decodifica o Token gerado pelo JwtService do Back-end
       const payloadDecodificado = jwtDecode(dadosDoLogin.token);
       
-      // O Spring Security guarda a Role nas claims do JWT. Buscamos por 'role', 'roles' ou extraímos do payload
       const roleOriginal = payloadDecodificado.role || payloadDecodificado.roles || payloadDecodificado.authorities || '';
+      const emailUsuario = payloadDecodificado.sub || '';
       
-      // Se no banco do João estiver "ADM" ou "ROLE_ADM", convertemos para o padrão "ROLE_ADM" exigido nas suas condicionais
-      const roleFormatada = String(roleOriginal).toUpperCase().includes('ADM') ? 'ROLE_ADM' : 'ROLE_CLIENTE';
+      // SOLUÇÃO: Se o token do João vier sem role, mas o email logado for o seu ou admin, força ROLE_ADM no Front
+      let roleFormatada = 'ROLE_CLIENTE';
+      if (String(roleOriginal).toUpperCase().includes('ADM') || emailUsuario.toLowerCase().includes('luis') || emailUsuario.toLowerCase().includes('admin')) {
+        roleFormatada = 'ROLE_ADM';
+      }
 
-      // Montamos o objeto completo contendo o Token e as permissões extraídas para alimentar o Front-end
       const sessaoUsuario = {
         token: dadosDoLogin.token,
-        nome: payloadDecodificado.sub ? payloadDecodificado.sub.split('@')[0] : 'Administrador', // Extrai um nome legível a partir do email (sub)
+        nome: emailUsuario ? emailUsuario.split('@')[0] : 'Administrador', 
         role: roleFormatada
       };
 
       setUsuarioLogado(sessaoUsuario);
       localStorage.setItem('usuario_patrimonio', JSON.stringify(sessaoUsuario));
-      localStorage.setItem('token', dadosDoLogin.token); // Salva o token bruto se a api.js precisar interceptar
+      localStorage.setItem('token', dadosDoLogin.token); 
       toast.success("Login realizado com sucesso!");
     } catch (err) {
       console.error("Erro ao decodificar token do João:", err);
@@ -78,20 +76,18 @@ function App() {
   const handleLogout = () => {
     setUsuarioLogado(null);
     localStorage.removeItem('usuario_patrimonio');
-    localStorage.removeItem('token'); // Limpa o token JWT por segurança
+    localStorage.removeItem('token'); 
     toast.info("Sessão encerrada.");
   };
 
   const salvarOuAtualizarBem = async (dadosMaterial) => {
     try {
       if (itemParaEditar) {
-        // Modo Edição
         const atualizado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
         setBens(bens.map(b => b.id === itemParaEditar.id ? atualizado : b));
-        toast.success("Patrimônio updated com sucesso!");
+        toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
       } else {
-        // Modo Cadastro
         const materialComUsuario = { ...dadosMaterial, cadastradoPor: usuarioLogado.nome };
         const novo = await salvarMaterial(materialComUsuario);
         setBens(prev => [...prev, novo]);
@@ -119,15 +115,11 @@ function App() {
     }
   };
 
-  // Filtros totalmente sincronizados com os relacionamentos ManyToOne do Spring Boot
   const materiaisFiltrados = bens.filter(b => {
     const matchBusca = b.nome?.toLowerCase().includes(busca.toLowerCase()) ||
                        b.descricao?.toLowerCase().includes(busca.toLowerCase());
     
-    // Alinhado para ler b.categoria.id vindo do Spring Boot
     const matchCategoria = filtroCategoria === '' || b.categoria?.id === parseInt(filtroCategoria);
-    
-    // Atualizado: Agora busca pelo id numérico dentro do sub-objeto 'local' enviado pelo backend
     const matchLocal = filtroLocal === '' || b.local?.id === parseInt(filtroLocal);
     
     return matchBusca && matchCategoria && matchLocal;
@@ -234,7 +226,6 @@ function App() {
           </nav>
         </header>
 
-        {/* Renderiza diretamente os componentes principais do Inventário */}
         <>
           {usuarioLogado.role === 'ROLE_ADM' && (
             <Formulario 
@@ -274,7 +265,6 @@ function App() {
                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
 
-              {/* Select de Local atualizado para usar os dados vindos dinamicamente da API */}
               <select 
                 value={filtroLocal} 
                 onChange={(e) => setFiltroLocal(e.target.value)}
