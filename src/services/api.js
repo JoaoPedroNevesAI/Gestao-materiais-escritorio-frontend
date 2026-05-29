@@ -80,6 +80,22 @@ export const listarCategorias = async () => {
   }
 };
 
+// --- NOVA: LISTAR LOCAIS (Pedido pelo João na branch feature/local) ---
+export const listarLocais = async () => {
+  try {
+    const response = await api.get('/local');
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao listar locais:', error.response || error);
+    // Retorna dados mocados para a interface renderizar mesmo sem o servidor Java ligado!
+    return [
+      { id: 1, nome: 'Departamento TI' },
+      { id: 2, nome: 'Escritório' },
+      { id: 3, nome: 'Recepção' }
+    ];
+  }
+};
+
 // --- USUARIO ---
 export const salvarUsuario = async (dados) => {
   try {

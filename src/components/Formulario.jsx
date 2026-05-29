@@ -1,15 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { listarCategorias } from '../services/api';
+import { listarCategorias, listarLocais } from '../services/api';
 
 export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao, darkMode }) { 
   const [categorias, setCategorias] = useState([]);
-  
-  // Lista de locais mapeada de acordo com as constantes ou enums aceitos no seu Backend Java
-  const [locais] = useState([
-    { valorJava: 'RECP', nomeExibicao: 'Recepção' },
-    { valorJava: 'ESCR', nomeExibicao: 'Escritório' },
-    { valorJava: 'TI', nomeExibicao: 'Departamento de TI' }
-  ]);
+  const [locais, setLocais] = useState([]); // Agora os locais vêm dinamicamente do backend
   
   // Estado único para todos os campos do formulário
   const [formData, setFormData] = useState({
@@ -17,18 +11,22 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     descricao: '',
     quantidade: '',
     categoriaId: '',
-    local: '', // Ajustado para corresponder a propriedade String/Enum do backend
+    localId: '', // Alterado de 'local' para 'localId' conforme as instruções do João
     valor: '',
     imagemUrl: '',
     dataAquisicao: '',
     dataLimiteManutencao: ''
   });
 
-  // Carrega categorias ao iniciar
+  // Carrega categorias e locais ao iniciar
   useEffect(() => {
     listarCategorias()
       .then(dados => setCategorias(dados))
       .catch(err => console.error("Erro ao buscar categorias no formulário:", err));
+
+    listarLocais()
+      .then(dados => setLocais(dados))
+      .catch(err => console.error("Erro ao buscar locais no formulário:", err));
   }, []);
 
   // Monitora se há um bem selecionado para editar e preenche o form
@@ -38,12 +36,10 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         nome: bemParaEditar.nome || '',
         descricao: bemParaEditar.descricao || '',
         quantidade: bemParaEditar.quantidade || '',
-        // Extrai o ID do sub-objeto 'categoria' que vem do Java
         categoriaId: bemParaEditar.categoria?.id || '',
-        local: bemParaEditar.local || '',
+        localId: bemParaEditar.local?.id || '', // Busca o id de dentro do relacionamento ManyToOne
         valor: bemParaEditar.valor || '',
         imagemUrl: bemParaEditar.imagemUrl || '',
-        // Formata data de forma segura para o padrão do input HTML (YYYY-MM-DD)
         dataAquisicao: bemParaEditar.dataAquisicao ? bemParaEditar.dataAquisicao.split('T')[0] : '',
         dataLimiteManutencao: bemParaEditar.dataLimiteManutencao ? bemParaEditar.dataLimiteManutencao.split('T')[0] : ''
       });
@@ -55,7 +51,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   const limparCampos = () => {
     setFormData({
       nome: '', descricao: '', quantidade: '', categoriaId: '',
-      local: '', valor: '', imagemUrl: '', dataAquisicao: '', dataLimiteManutencao: ''
+      localId: '', valor: '', imagemUrl: '', dataAquisicao: '', dataLimiteManutencao: ''
     });
   };
 
@@ -68,19 +64,19 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // CORRIGIDO: Remonta o objeto no formato exato que as entidades JPA e Controllers do Spring esperam
+    // Remonta o objeto no formato exato que a branch feature/local espera
     const materialFormatado = {
-      id: bemParaEditar?.id || null, // Garante o ID original se for uma edição
+      id: bemParaEditar?.id || null, 
       nome: formData.nome,
       descricao: formData.descricao,
       quantidade: parseInt(formData.quantidade) || 0,
-      valor: formData.valor ? parseFloat(formData.valor) : 0.0, // Evita passar null para Double/BigDecimal no Java
-      local: formData.local || null,
+      valor: formData.valor ? parseFloat(formData.valor) : 0.0, 
       imagemUrl: formData.imagemUrl || '',
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
-      // O SEGREDO DO SPRING BOOT: passar o sub-objeto estruturado com o ID correto da categoria
-      categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null
+      categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
+      // Passando o localId tratado como inteiro para o endpoint de cadastro/edição
+      localId: formData.localId ? parseInt(formData.localId) : null
     };
 
     aoAdicionar(materialFormatado);
@@ -167,17 +163,17 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
           ))}
         </select>
 
-        {/* Local */}
+        {/* Local - Atualizado para renderizar dinamicamente os objetos vindos do endpoint do João */}
         <select 
-          name="local" 
-          value={formData.local} 
+          name="localId" 
+          value={formData.localId} 
           onChange={handleChange} 
           required
           style={styles.input}
         >
           <option value="">Selecione um local</option>
           {locais.map(loc => (
-            <option key={loc.valorJava} value={loc.valorJava}>{loc.nomeExibicao}</option>
+            <option key={loc.id} value={loc.id}>{loc.nome}</option>
           ))}
         </select>
 

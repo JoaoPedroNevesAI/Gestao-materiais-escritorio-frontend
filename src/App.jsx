@@ -4,7 +4,8 @@ import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
 import ListaAcessos from './components/ListaAcessos';
 import { ToastContainer, toast } from 'react-toastify';
-import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial } from './services/api'; 
+// Importação atualizada incluindo o listarLocais
+import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroLocal, setFiltroLocal] = useState('');
   const [categorias, setCategorias] = useState([]);
+  const [locais, setLocais] = useState([]); // Novo estado para carregar os locais dinamicamente no filtro
   const [itemParaEditar, setItemParaEditar] = useState(null);
 
   useEffect(() => {
@@ -30,6 +32,11 @@ function App() {
       listarCategorias()
         .then(setCategorias)
         .catch(() => console.error("Erro ao carregar categorias."));
+
+      // Carrega os locais da API para alimentar o Select de Filtro
+      listarLocais()
+        .then(setLocais)
+        .catch(() => console.error("Erro ao carregar locais."));
     }
   }, [usuarioLogado]);
 
@@ -51,7 +58,7 @@ function App() {
         // Modo Edição
         const atualizado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
         setBens(bens.map(b => b.id === itemParaEditar.id ? atualizado : b));
-        toast.success("Patrimônio atualizado com sucesso!");
+        toast.success("Patrimônio updated com sucesso!");
         setItemParaEditar(null);
       } else {
         // Modo Cadastro
@@ -82,7 +89,7 @@ function App() {
     }
   };
 
-  // Filtros ajustados conforme a resposta de objetos do Java
+  // Filtros totalmente sincronizados com os relacionamentos ManyToOne do Spring Boot
   const materiaisFiltrados = bens.filter(b => {
     const matchBusca = b.nome?.toLowerCase().includes(busca.toLowerCase()) ||
                        b.descricao?.toLowerCase().includes(busca.toLowerCase());
@@ -90,8 +97,8 @@ function App() {
     // Alinhado para ler b.categoria.id vindo do Spring Boot
     const matchCategoria = filtroCategoria === '' || b.categoria?.id === parseInt(filtroCategoria);
     
-    // Mantido o filtro de local 
-    const matchLocal = filtroLocal === '' || b.local === filtroLocal || b.localId === parseInt(filtroLocal);
+    // Atualizado: Agora busca pelo id numérico dentro do sub-objeto 'local' enviado pelo backend
+    const matchLocal = filtroLocal === '' || b.local?.id === parseInt(filtroLocal);
     
     return matchBusca && matchCategoria && matchLocal;
   });
@@ -237,6 +244,7 @@ function App() {
                 {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
 
+              {/* Select de Local atualizado para usar os dados vindos dinamicamente da API */}
               <select 
                 value={filtroLocal} 
                 onChange={(e) => setFiltroLocal(e.target.value)}
@@ -248,9 +256,9 @@ function App() {
                 }}
               >
                 <option value="">Todos os Locais</option>
-                <option value="TI">TI</option>
-                <option value="ESCR">Escritório</option>
-                <option value="RECP">Recepção</option>
+                {locais.map(loc => (
+                  <option key={loc.id} value={loc.id}>{loc.nome}</option>
+                ))}
               </select>
             </div>
 
