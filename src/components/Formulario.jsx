@@ -64,7 +64,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Remonta o objeto no formato exato que a branch feature/local espera
+    // Remonta o objeto garantindo compatibilidade total com o mapeamento JPA do João
     const materialFormatado = {
       id: bemParaEditar?.id || null, 
       nome: formData.nome,
@@ -75,8 +75,12 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
       categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
-      // Passando o localId tratado como inteiro para o endpoint de cadastro/edição
-      localId: formData.localId ? parseInt(formData.localId) : null
+      
+      // 1. Passando o id numérico direto na raiz se ele usar um DTO achatado
+      localId: formData.localId ? parseInt(formData.localId) : null,
+      
+      // 2. CORREÇÃO: Passando o sub-objeto estruturado que a entidade JPA ManyToOne exige no Spring para persistir
+      local: formData.localId ? { id: parseInt(formData.localId) } : null
     };
 
     aoAdicionar(materialFormatado);
@@ -163,7 +167,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
           ))}
         </select>
 
-        {/* Local - Atualizado para renderizar dinamicamente os objetos vindos do endpoint do João */}
+        {/* Local */}
         <select 
           name="localId" 
           value={formData.localId} 
