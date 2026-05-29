@@ -4,6 +4,7 @@ import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
 import ListaAcessos from './components/ListaAcessos';
 import { ToastContainer, toast } from 'react-toastify';
+import { jwtDecode } from 'jwt-decode'; // Importando o decodificador de Token JWT
 // Importação atualizada incluindo o listarLocais
 import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
@@ -40,9 +41,38 @@ function App() {
     }
   }, [usuarioLogado]);
 
-  const handleLogin = (dados) => {
-    setUsuarioLogado(dados);
-    localStorage.setItem('usuario_patrimonio', JSON.stringify(dados));
+  // CORREÇÃO: Trata a resposta do login contendo apenas { token: "ey..." } do João
+  const handleLogin = (dadosDoLogin) => {
+    if (!dadosDoLogin || !dadosDoLogin.token) {
+      toast.error("Erro na autenticação: Token não fornecido.");
+      return;
+    }
+
+    try {
+      // Decodifica o Token gerado pelo JwtService do Back-end
+      const payloadDecodificado = jwtDecode(dadosDoLogin.token);
+      
+      // O Spring Security guarda a Role nas claims do JWT. Buscamos por 'role', 'roles' ou extraímos do payload
+      const roleOriginal = payloadDecodificado.role || payloadDecodificado.roles || payloadDecodificado.authorities || '';
+      
+      // Se no banco do João estiver "ADM" ou "ROLE_ADM", convertemos para o padrão "ROLE_ADM" exigido nas suas condicionais
+      const roleFormatada = String(roleOriginal).toUpperCase().includes('ADM') ? 'ROLE_ADM' : 'ROLE_CLIENTE';
+
+      // Montamos o objeto completo contendo o Token e as permissões extraídas para alimentar o Front-end
+      const sessaoUsuario = {
+        token: dadosDoLogin.token,
+        nome: payloadDecodificado.sub ? payloadDecodificado.sub.split('@')[0] : 'Administrador', // Extrai um nome legível a partir do email (sub)
+        role: roleFormatada
+      };
+
+      setUsuarioLogado(sessaoUsuario);
+      localStorage.setItem('usuario_patrimonio', JSON.stringify(sessaoUsuario));
+      localStorage.setItem('token', dadosDoLogin.token); // Salva o token bruto se a api.js precisar interceptar
+      toast.success("Login realizado com sucesso!");
+    } catch (err) {
+      console.error("Erro ao decodificar token do João:", err);
+      toast.error("Erro ao processar as credenciais do Token de autenticação.");
+    }
   };
 
   const handleLogout = () => {
