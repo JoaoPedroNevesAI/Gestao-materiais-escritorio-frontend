@@ -96,9 +96,9 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                   </span>
                 </td>
 
-                {/* Local */}
+                {/* CORRIGIDO: Acessa o nome da propriedade String de dentro do objeto local de forma segura */}
                 <td style={{ padding: '12px' }}>
-                  {item.local || '—'}
+                  {item.local?.nome || '—'}
                 </td>
 
                 {/* Valor */}
@@ -161,7 +161,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
 
                     </div>
 
-                    {/* Janela flutuante do QR Code */}
+                    {/* Janela flutuante do QR Code - CORRIGIDO: Acessa item.local?.nome no value */}
                     {qrVisivel === item.id && (
                       <div style={{ 
                         position: 'absolute', 
@@ -176,7 +176,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                         boxShadow: '0 4px 12px rgba(0,0,0,0.15)' 
                       }}>
                         <QRCodeSVG 
-                          value={`PATRIMONIO_ID: ${item.id}\nNOME: ${item.nome}\nLOCAL: ${item.local}`} 
+                          value={`PATRIMONIO_ID: ${item.id}\nNOME: ${item.nome}\nLOCAL: ${item.local?.nome || 'Não Informado'}`} 
                           size={110} 
                         />
                         <div style={{ fontSize: '9px', marginTop: '5px', color: '#666' }}>ID: {item.id}</div>
