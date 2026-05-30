@@ -40,36 +40,57 @@ function App() {
   }, [usuarioLogado]);
 
   const handleLogin = (dadosDoLogin) => {
-    if (!dadosDoLogin || !dadosDoLogin.token) {
+    if (!dadosDoLogin) {
+      toast.error("Erro na autenticação: Resposta vazia.");
+      return;
+    }
+
+    const tokenString = typeof dadosDoLogin === 'string' ? dadosDoLogin : dadosDoLogin.token;
+
+    if (!tokenString) {
       toast.error("Erro na autenticação: Token não fornecido.");
       return;
     }
 
     try {
-      const payloadDecodificado = jwtDecode(dadosDoLogin.token);
-      
-      const roleOriginal = payloadDecodificado.role || payloadDecodificado.roles || payloadDecodificado.authorities || '';
+      // Decodifica o payload do JWT enviado pelo Back-end
+      const payloadDecodificado = jwtDecode(tokenString);
       const emailUsuario = payloadDecodificado.sub || '';
       
-      // SOLUÇÃO: Se o token do João vier sem role, mas o email logado for o seu ou admin, força ROLE_ADM no Front
-      let roleFormatada = 'ROLE_CLIENTE';
-      if (String(roleOriginal).toUpperCase().includes('ADM') || emailUsuario.toLowerCase().includes('luis') || emailUsuario.toLowerCase().includes('admin')) {
-        roleFormatada = 'ROLE_ADM';
+      if (!emailUsuario) {
+        toast.error("Token válido, mas sem identificação do usuário (sub).");
+        return;
       }
 
+      // CORREÇÃO: Pega a role real direto de dentro do Token JWT retornado pelo Spring Security
+      // Caso venha numa lista, extraímos o primeiro valor. Se não encontrar, assume CLIENTE.
+      let roleFormatada = 'ROLE_CLIENTE';
+      if (payloadDecodificado.authorities) {
+        if (Array.isArray(payloadDecodificado.authorities)) {
+          roleFormatada = payloadDecodificado.authorities[0] || 'ROLE_CLIENTE';
+        } else if (typeof payloadDecodificado.authorities === 'string') {
+          roleFormatada = payloadDecodificado.authorities;
+        }
+      }
+
+      // Formata o nome de exibição (ex: jojo@gmail.com vira "Jojo")
+      const nomeUsuarioRaw = emailUsuario ? emailUsuario.split('@')[0] : 'Usuário';
+      const nomeFormatado = nomeUsuarioRaw.charAt(0).toUpperCase() + nomeUsuarioRaw.slice(1);
+
       const sessaoUsuario = {
-        token: dadosDoLogin.token,
-        nome: emailUsuario ? emailUsuario.split('@')[0] : 'Administrador', 
+        token: tokenString,
+        nome: nomeFormatado, 
         role: roleFormatada
       };
 
       setUsuarioLogado(sessaoUsuario);
       localStorage.setItem('usuario_patrimonio', JSON.stringify(sessaoUsuario));
-      localStorage.setItem('token', dadosDoLogin.token); 
-      toast.success("Login realizado com sucesso!");
+      localStorage.setItem('token', tokenString); 
+      
+      toast.success(`Bem-vindo, ${nomeFormatado}!`);
     } catch (err) {
-      console.error("Erro ao decodificar token do João:", err);
-      toast.error("Erro ao processar as credenciais do Token de autenticação.");
+      console.error("Erro crítico ao decodificar token de autenticação:", err);
+      toast.error("Erro ao processar as credenciais do Token.");
     }
   };
 
@@ -83,8 +104,8 @@ function App() {
   const salvarOuAtualizarBem = async (dadosMaterial) => {
     try {
       if (itemParaEditar) {
-        const atualizado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
-        setBens(bens.map(b => b.id === itemParaEditar.id ? atualizado : b));
+        const updated = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
+        setBens(bens.map(b => b.id === itemParaEditar.id ? updated : b));
         toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
       } else {
