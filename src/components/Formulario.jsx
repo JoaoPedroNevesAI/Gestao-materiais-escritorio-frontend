@@ -65,23 +65,21 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     e.preventDefault();
     
     // Remonta o objeto garantindo compatibilidade total com o mapeamento JPA do João
-    const materialFormatado = {
-      id: bemParaEditar?.id || null, 
-      nome: formData.nome,
-      descricao: formData.descricao,
-      quantidade: parseInt(formData.quantidade) || 0,
-      valor: formData.valor ? parseFloat(formData.valor) : 0.0, 
-      imagemUrl: formData.imagemUrl || '',
-      dataAquisicao: formData.dataAquisicao,
-      dataLimiteManutencao: formData.dataLimiteManutencao,
-      categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
-      
-      // 1. Passando o id numérico direto na raiz se ele usar um DTO achatado
-      localId: formData.localId ? parseInt(formData.localId) : null,
-      
-      // 2. CORREÇÃO: Passando o sub-objeto estruturado que a entidade JPA ManyToOne exige no Spring para persistir
-      local: formData.localId ? { id: parseInt(formData.localId) } : null
-    };
+  const materialFormatado = {
+    nome: formData.nome,
+    descricao: formData.descricao,
+    quantidade: parseInt(formData.quantidade),
+
+    categoriaId: parseInt(formData.categoriaId),
+
+    localId: parseInt(formData.localId),
+
+    valor: formData.valor
+      ? parseFloat(formData.valor)
+      : null,
+
+    imagemUrl: formData.imagemUrl || null
+  };
 
     aoAdicionar(materialFormatado);
     if (!bemParaEditar) limparCampos();

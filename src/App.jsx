@@ -4,7 +4,6 @@ import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
 import ListaAcessos from './components/ListaAcessos';
 import { ToastContainer, toast } from 'react-toastify';
-import { jwtDecode } from 'jwt-decode'; 
 import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -40,38 +39,34 @@ function App() {
   }, [usuarioLogado]);
 
   const handleLogin = (dadosDoLogin) => {
-    if (!dadosDoLogin || !dadosDoLogin.token) {
-      toast.error("Erro na autenticação: Token não fornecido.");
-      return;
-    }
 
-    try {
-      const payloadDecodificado = jwtDecode(dadosDoLogin.token);
-      
-      const roleOriginal = payloadDecodificado.role || payloadDecodificado.roles || payloadDecodificado.authorities || '';
-      const emailUsuario = payloadDecodificado.sub || '';
-      
-      // SOLUÇÃO: Se o token do João vier sem role, mas o email logado for o seu ou admin, força ROLE_ADM no Front
-      let roleFormatada = 'ROLE_CLIENTE';
-      if (String(roleOriginal).toUpperCase().includes('ADM') || emailUsuario.toLowerCase().includes('luis') || emailUsuario.toLowerCase().includes('admin')) {
-        roleFormatada = 'ROLE_ADM';
+      console.log("RECEBI NO APP:", dadosDoLogin);
+
+      if (!dadosDoLogin?.token) {
+        toast.error("Erro na autenticação: Token não fornecido.");
+        return;
       }
 
       const sessaoUsuario = {
         token: dadosDoLogin.token,
-        nome: emailUsuario ? emailUsuario.split('@')[0] : 'Administrador', 
-        role: roleFormatada
+        nome: dadosDoLogin.nome,
+        role: dadosDoLogin.role
       };
 
       setUsuarioLogado(sessaoUsuario);
-      localStorage.setItem('usuario_patrimonio', JSON.stringify(sessaoUsuario));
-      localStorage.setItem('token', dadosDoLogin.token); 
+
+      localStorage.setItem(
+        'usuario_patrimonio',
+        JSON.stringify(sessaoUsuario)
+      );
+
+      localStorage.setItem(
+        'token',
+        dadosDoLogin.token
+      );
+
       toast.success("Login realizado com sucesso!");
-    } catch (err) {
-      console.error("Erro ao decodificar token do João:", err);
-      toast.error("Erro ao processar as credenciais do Token de autenticação.");
-    }
-  };
+    };
 
   const handleLogout = () => {
     setUsuarioLogado(null);
