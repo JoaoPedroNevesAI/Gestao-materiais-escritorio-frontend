@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Formulario from './components/Formulario';
 import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
+import AprovacaoMovimentacao from './components/AprovacaoMovimentacao';
 import ListaAcessos from './components/ListaAcessos';
 import { ToastContainer, toast } from 'react-toastify';
 import { jwtDecode } from 'jwt-decode'; 
@@ -22,6 +23,9 @@ function App() {
   const [categorias, setCategorias] = useState([]);
   const [locais, setLocais] = useState([]); 
   const [itemParaEditar, setItemParaEditar] = useState(null);
+  
+  // ESTADO ADICIONADO: Controla qual aba está ativa na tela
+  const [abaAtiva, setAbaAtiva] = useState('inventario'); 
 
   useEffect(() => {
     if (usuarioLogado) {
@@ -53,7 +57,6 @@ function App() {
     }
 
     try {
-      // Decodifica o payload do JWT enviado pelo Back-end
       const payloadDecodificado = jwtDecode(tokenString);
       const emailUsuario = payloadDecodificado.sub || '';
       
@@ -62,8 +65,6 @@ function App() {
         return;
       }
 
-      // CORREÇÃO: Pega a role real direto de dentro do Token JWT retornado pelo Spring Security
-      // Caso venha numa lista, extraímos o primeiro valor. Se não encontrar, assume CLIENTE.
       let roleFormatada = 'ROLE_CLIENTE';
       if (payloadDecodificado.authorities) {
         if (Array.isArray(payloadDecodificado.authorities)) {
@@ -73,7 +74,6 @@ function App() {
         }
       }
 
-      // Formata o nome de exibição (ex: jojo@gmail.com vira "Jojo")
       const nomeUsuarioRaw = emailUsuario ? emailUsuario.split('@')[0] : 'Usuário';
       const nomeFormatado = nomeUsuarioRaw.charAt(0).toUpperCase() + nomeUsuarioRaw.slice(1);
 
@@ -98,6 +98,7 @@ function App() {
     setUsuarioLogado(null);
     localStorage.removeItem('usuario_patrimonio');
     localStorage.removeItem('token'); 
+    setAbaAtiva('inventario'); // Reseta a aba ao deslogar
     toast.info("Sessão encerrada.");
   };
 
@@ -121,6 +122,7 @@ function App() {
 
   const prepararEdicao = (item) => {
     setItemParaEditar(item);
+    setAbaAtiva('inventario'); // Garante que volta para a aba do formulário para editar
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -232,86 +234,109 @@ function App() {
             </div>
           </div>
 
-          <nav style={{ marginTop: '20px', borderBottom: `1px solid ${themeStyles.borderColor}` }}>
+          {/* MENU DE ABAS CORRIGIDO COM ESTILO DINÂMICO */}
+          <nav style={{ marginTop: '20px', borderBottom: `1px solid ${themeStyles.borderColor}`, display: 'flex', gap: '10px' }}>
             <button 
+              onClick={() => setAbaAtiva('inventario')}
               style={{ 
                 padding: '10px 20px', border: 'none', 
-                background: darkMode ? '#1a73e833' : '#e8f0fe', 
-                color: '#1a73e8', 
+                background: abaAtiva === 'inventario' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                color: abaAtiva === 'inventario' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
                 cursor: 'pointer', fontWeight: 'bold',
-                borderBottom: '3px solid #1a73e8'
+                borderBottom: abaAtiva === 'inventario' ? '3px solid #1a73e8' : '3px solid transparent'
               }}
             >
               📦 Inventário
             </button>
+            
+            {usuarioLogado.role === 'ROLE_ADM' && (
+              <button 
+                onClick={() => setAbaAtiva('transferencia')}
+                style={{ 
+                  padding: '10px 20px', border: 'none', 
+                  background: abaAtiva === 'transferencia' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                  color: abaAtiva === 'transferencia' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
+                  cursor: 'pointer', fontWeight: 'bold',
+                  borderBottom: abaAtiva === 'transferencia' ? '3px solid #1a73e8' : '3px solid transparent'
+                }}
+              >
+                🔄 Transferências
+              </button>
+            )}
           </nav>
         </header>
 
-        <>
-          {usuarioLogado.role === 'ROLE_ADM' && (
-            <Formulario 
-              aoAdicionar={salvarOuAtualizarBem} 
-              bemParaEditar={itemParaEditar} 
-              cancelarEdicao={() => setItemParaEditar(null)}
-              darkMode={darkMode} 
-            />
-          )}
-          
-          <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <input
-                type="text"
-                placeholder="Buscar por nome ou descrição..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                style={{ 
-                  flex: 2, padding: '10px', borderRadius: '8px', 
-                  border: `1px solid ${themeStyles.borderColor}`,
-                  backgroundColor: themeStyles.inputBg,
-                  color: themeStyles.color
-                }}
+        {/* EXIBIÇÃO CONDICIONAL DAS TELAS BASEADA NA ABA SELECIONADA */}
+        {abaAtiva === 'inventario' ? (
+          <>
+            {usuarioLogado.role === 'ROLE_ADM' && (
+              <Formulario 
+                aoAdicionar={salvarOuAtualizarBem} 
+                bemParaEditar={itemParaEditar} 
+                cancelarEdicao={() => setItemParaEditar(null)}
+                darkMode={darkMode} 
               />
-              
-              <select 
-                value={filtroCategoria} 
-                onChange={(e) => setFiltroCategoria(e.target.value)}
-                style={{ 
-                  flex: 1, padding: '10px', borderRadius: '8px', 
-                  border: `1px solid ${themeStyles.borderColor}`,
-                  backgroundColor: themeStyles.inputBg,
-                  color: themeStyles.color
-                }}
-              >
-                <option value="">Todas Categorias</option>
-                {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
+            )}
+            
+            <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou descrição..."
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  style={{ 
+                    flex: 2, padding: '10px', borderRadius: '8px', 
+                    border: `1px solid ${themeStyles.borderColor}`,
+                    backgroundColor: themeStyles.inputBg,
+                    color: themeStyles.color
+                  }}
+                />
+                
+                <select 
+                  value={filtroCategoria} 
+                  onChange={(e) => setFiltroCategoria(e.target.value)}
+                  style={{ 
+                    flex: 1, padding: '10px', borderRadius: '8px', 
+                    border: `1px solid ${themeStyles.borderColor}`,
+                    backgroundColor: themeStyles.inputBg,
+                    color: themeStyles.color
+                  }}
+                >
+                  <option value="">Todas Categorias</option>
+                  {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
 
-              <select 
-                value={filtroLocal} 
-                onChange={(e) => setFiltroLocal(e.target.value)}
-                style={{ 
-                  flex: 1, padding: '10px', borderRadius: '8px', 
-                  border: `1px solid ${themeStyles.borderColor}`,
-                  backgroundColor: themeStyles.inputBg,
-                  color: themeStyles.color
-                }}
-              >
-                <option value="">Todos os Locais</option>
-                {locais.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.nome}</option>
-                ))}
-              </select>
+                <select 
+                  value={filtroLocal} 
+                  onChange={(e) => setFiltroLocal(e.target.value)}
+                  style={{ 
+                    flex: 1, padding: '10px', borderRadius: '8px', 
+                    border: `1px solid ${themeStyles.borderColor}`,
+                    backgroundColor: themeStyles.inputBg,
+                    color: themeStyles.color
+                  }}
+                >
+                  <option value="">Todos os Locais</option>
+                  {locais.map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <TabelaEstoque 
+                materiais={materiaisFiltrados} 
+                aoRemover={removerBem} 
+                aoEditar={prepararEdicao} 
+                darkMode={darkMode} 
+                usuarioLogado={usuarioLogado} 
+              />
             </div>
-
-            <TabelaEstoque 
-              materiais={materiaisFiltrados} 
-              aoRemover={removerBem} 
-              aoEditar={prepararEdicao} 
-              darkMode={darkMode} 
-              usuarioLogado={usuarioLogado} 
-            />
-          </div>
-        </>
+          </>
+        ) : (
+          /* RENDERIZAÇÃO DA SUA NOVA TELA DE MOVIMENTAÇÃO/TRANSFERÊNCIA */
+          <AprovacaoMovimentacao />
+        )}
       </div>
 
       {usuarioLogado.role === 'ROLE_ADM' && (
@@ -323,6 +348,7 @@ function App() {
           borderLeft: `1px solid ${themeStyles.borderColor}`, 
           backgroundColor: themeStyles.cardBg 
         }}>
+          <SidebarAcessos /> {/* Tratando ListaAcessos se necessário */}
           <ListaAcessos darkMode={darkMode} />
         </div>
       )}
