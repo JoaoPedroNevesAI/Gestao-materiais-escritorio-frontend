@@ -1,25 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { listarCategorias, listarLocais } from '../services/api';
+// Importamos o 'api' padrão para fazer os posts de criação rápida
+import api, { listarCategorias, listarLocais } from '../services/api'; 
 
 export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao, darkMode }) { 
   const [categorias, setCategorias] = useState([]);
-  const [locais, setLocais] = useState([]); // Agora os locais vêm dinamicamente do backend
+  const [locais, setLocais] = useState([]); 
   
-  // Estado único para todos os campos do formulário
   const [formData, setFormData] = useState({
     nome: '',
     descricao: '',
     quantidade: '',
     categoriaId: '',
-    localId: '', // Alterado de 'local' para 'localId' conforme as instruções do João
+    localId: '', 
     valor: '',
     imagemUrl: '',
     dataAquisicao: '',
     dataLimiteManutencao: ''
   });
 
-  // Carrega categorias e locais ao iniciar
-  useEffect(() => {
+  // Função para recarregar as listas do zero
+  const atualizarListas = () => {
     listarCategorias()
       .then(dados => setCategorias(dados))
       .catch(err => console.error("Erro ao buscar categorias no formulário:", err));
@@ -27,9 +27,12 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     listarLocais()
       .then(dados => setLocais(dados))
       .catch(err => console.error("Erro ao buscar locais no formulário:", err));
+  };
+
+  useEffect(() => {
+    atualizarListas();
   }, []);
 
-  // Monitora se há um bem selecionado para editar e preenche o form
   useEffect(() => {
     if (bemParaEditar) {
       setFormData({
@@ -37,7 +40,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         descricao: bemParaEditar.descricao || '',
         quantidade: bemParaEditar.quantidade || '',
         categoriaId: bemParaEditar.categoria?.id || '',
-        localId: bemParaEditar.local?.id || '', // Busca o id de dentro do relacionamento ManyToOne
+        localId: bemParaEditar.local?.id || '', 
         valor: bemParaEditar.valor || '',
         imagemUrl: bemParaEditar.imagemUrl || '',
         dataAquisicao: bemParaEditar.dataAquisicao ? bemParaEditar.dataAquisicao.split('T')[0] : '',
@@ -55,16 +58,44 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     });
   };
 
-  // Atualiza o estado dinamicamente conforme o usuário digita
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- FUNÇÕES DE CRIAÇÃO RÁPIDA ---
+  const handleCriarCategoriaRapida = async () => {
+    const nomeCat = prompt("Digite o nome da nova Categoria (Ex: Eletrônicos, Móveis):");
+    if (!nomeCat || nomeCat.trim() === "") return;
+
+    try {
+      await api.post('/categoria', { nome: nomeCat });
+      alert("Categoria criada com sucesso!");
+      atualizarListas(); // Atualiza o select automaticamente
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao criar categoria. Veja se a rota está certa ou se o Spring barrou.");
+    }
+  };
+
+  const handleCriarLocalRapido = async () => {
+    const nomeLoc = prompt("Digite o nome do novo Local (Ex: Sala 103, Laboratório 2):");
+    if (!nomeLoc || nomeLoc.trim() === "") return;
+
+    try {
+      await api.post('/local', { nome: nomeLoc });
+      alert("Local criado com sucesso!");
+      atualizarListas(); // Atualiza o select automaticamente
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao criar local. Verifique os logs do console.");
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Remonta o objeto garantindo compatibilidade total com o mapeamento JPA do João
+    // CORREÇÃO: Montando o objeto exatamente como a classe MaterialRequest exige no Spring
     const materialFormatado = {
       id: bemParaEditar?.id || null, 
       nome: formData.nome,
@@ -74,12 +105,13 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       imagemUrl: formData.imagemUrl || '',
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
-      categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
       
-      // 1. Passando o id numérico direto na raiz se ele usar um DTO achatado
+      // Enviando os IDs numéricos soltos na raiz para passar pelo @NotNull
+      categoriaId: formData.categoriaId ? parseInt(formData.categoriaId) : null,
       localId: formData.localId ? parseInt(formData.localId) : null,
-      
-      // 2. CORREÇÃO: Passando o sub-objeto estruturado que a entidade JPA ManyToOne exige no Spring para persistir
+
+      // Mantidos aqui em paralelo caso a entidade exija herança reversa no salvamento direto
+      categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
       local: formData.localId ? { id: parseInt(formData.localId) } : null
     };
 
@@ -104,12 +136,30 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       padding: '10px',
       borderRadius: '6px',
       outline: 'none',
-      fontSize: '14px'
+      fontSize: '14px',
+      width: '100%',
+      boxSizing: 'border-box'
     },
     label: {
       fontSize: '12px',
       color: darkMode ? '#aaa' : '#666',
       fontWeight: '500'
+    },
+    flexContainer: {
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'center',
+      width: '100%'
+    },
+    btnMais: {
+      padding: '10px 14px',
+      backgroundColor: '#1a73e8',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontWeight: 'bold',
+      fontSize: '16px'
     }
   };
 
@@ -122,14 +172,16 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
         
         {/* Nome */}
-        <input 
-          name="nome" 
-          value={formData.nome}
-          onChange={handleChange}
-          placeholder="Nome do Bem (Ex: Cadeira Gamer)"
-          required 
-          style={{ ...styles.input, gridColumn: 'span 2' }} 
-        />
+        <div style={{ gridColumn: 'span 2' }}>
+          <input 
+            name="nome" 
+            value={formData.nome}
+            onChange={handleChange}
+            placeholder="Nome do Bem (Ex: Cadeira Gamer)"
+            required 
+            style={styles.input} 
+          />
+        </div>
 
         {/* Quantidade */}
         <input 
@@ -153,33 +205,39 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
           style={styles.input}
         />
 
-        {/* Categoria */}
-        <select 
-          name="categoriaId" 
-          value={formData.categoriaId} 
-          onChange={handleChange} 
-          required
-          style={styles.input}
-        >
-          <option value="">Selecione uma categoria</option>
-          {categorias.map(cat => (
-            <option key={cat.id} value={cat.id}>{cat.nome}</option>
-          ))}
-        </select>
+        {/* Categoria com botão + */}
+        <div style={styles.flexContainer}>
+          <select 
+            name="categoriaId" 
+            value={formData.categoriaId} 
+            onChange={handleChange} 
+            required
+            style={styles.input}
+          >
+            <option value="">Selecione uma categoria</option>
+            {categorias.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.nome}</option>
+            ))}
+          </select>
+          <button type="button" onClick={handleCriarCategoriaRapida} title="Adicionar nova categoria" style={styles.btnMais}>+</button>
+        </div>
 
-        {/* Local */}
-        <select 
-          name="localId" 
-          value={formData.localId} 
-          onChange={handleChange} 
-          required
-          style={styles.input}
-        >
-          <option value="">Selecione um local</option>
-          {locais.map(loc => (
-            <option key={loc.id} value={loc.id}>{loc.nome}</option>
-          ))}
-        </select>
+        {/* Local com botão + */}
+        <div style={styles.flexContainer}>
+          <select 
+            name="localId" 
+            value={formData.localId} 
+            onChange={handleChange} 
+            required
+            style={styles.input}
+          >
+            <option value="">Selecione um local</option>
+            {locais.map(loc => (
+              <option key={loc.id} value={loc.id}>{loc.nome}</option>
+            ))}
+          </select>
+          <button type="button" onClick={handleCriarLocalRapido} title="Adicionar novo local" style={styles.btnMais}>+</button>
+        </div>
 
         {/* Data de Aquisição */}
         <div style={{ display: 'grid', gap: '5px' }}>
@@ -208,22 +266,26 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         </div>
 
         {/* Descrição */}
-        <textarea 
-          name="descricao" 
-          value={formData.descricao}
-          onChange={handleChange}
-          placeholder="Descrição / Estado de conservação do bem"
-          style={{ ...styles.input, gridColumn: 'span 2', height: '80px', resize: 'vertical' }} 
-        />
+        <div style={{ gridColumn: 'span 2' }}>
+          <textarea 
+            name="descricao" 
+            value={formData.descricao}
+            onChange={handleChange}
+            placeholder="Descrição / Estado de conservação do bem"
+            style={{ ...styles.input, height: '80px', resize: 'vertical' }} 
+          />
+        </div>
 
         {/* URL da Imagem */}
-        <input 
-          name="imagemUrl"
-          value={formData.imagemUrl}
-          onChange={handleChange}
-          placeholder="URL da imagem (opcional)"
-          style={{ ...styles.input, gridColumn: 'span 2' }}
-        />
+        <div style={{ gridColumn: 'span 2' }}>
+          <input 
+            name="imagemUrl"
+            value={formData.imagemUrl}
+            onChange={handleChange}
+            placeholder="URL da imagem (opcional)"
+            style={styles.input}
+          />
+        </div>
 
         {/* Preview da Imagem */}
         {formData.imagemUrl && (
