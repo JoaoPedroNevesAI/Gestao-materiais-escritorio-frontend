@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api'; // Sua instância do Axios
+import api, { listarMateriais, listarLocais } from '../services/api';
 
 export default function AprovacaoMovimentacao() {
   // Estados para os campos do formulário
@@ -13,16 +13,16 @@ export default function AprovacaoMovimentacao() {
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
 
-  // Carrega os materiais e locais disponíveis assim que a tela abre
+  // Carrega os materiais e locais disponíveis usando os serviços limpos
   useEffect(() => {
     const buscarDados = async () => {
       try {
-        const [resMateriais, resLocais] = await Promise.all([
-          api.get('/api/material'), // Rota de listar materiais da doc
-          api.get('/api/local')     // Rota de locais (subentendido na doc)
+        const [dadosMateriais, dadosLocais] = await Promise.all([
+          listarMateriais(),
+          listarLocais()
         ]);
-        setMateriais(resMateriais.data);
-        setLocais(resLocais.data);
+        setMateriais(dadosMateriais || []);
+        setLocais(dadosLocais || []);
       } catch (err) {
         console.error("Erro ao carregar dados iniciais", err);
       }
@@ -42,7 +42,6 @@ export default function AprovacaoMovimentacao() {
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
 
-    // Monta o objeto exatamente como o Back-end do João Pedro espera
     const dadosTransferencia = {
       materialId: Number(materialSelecionado),
       localDestinoId: Number(localDestino),
@@ -50,8 +49,7 @@ export default function AprovacaoMovimentacao() {
     };
 
     try {
-      // Endpoint exato da documentação do Back-end
-      await api.post('/api/movimentacao/transferir', dadosTransferencia);
+      await api.post('/movimentacao/transferir', dadosTransferencia);
       
       setMensagem({ tipo: 'sucesso', texto: 'Material transferido com sucesso!' });
       
@@ -59,6 +57,10 @@ export default function AprovacaoMovimentacao() {
       setMaterialSelecionado('');
       setLocalDestino('');
       setObservacao('');
+      
+      // Atualiza a lista de materiais para recalcular as quantidades na tela
+      const novosMateriais = await listarMateriais();
+      setMateriais(novosMateriais || []);
     } catch (err) {
       setMensagem({ tipo: 'erro', texto: 'Erro ao realizar a transferência. Verifique os dados.' });
       console.error(err);
@@ -67,41 +69,133 @@ export default function AprovacaoMovimentacao() {
     }
   };
 
+  // Objetos de estilo inline para substituir completamente o Tailwind e garantir o visual correto
+  const styles = {
+    container: {
+      width: '100%',
+      maxWidth: '600px',
+      margin: '40px auto',
+      padding: '30px',
+      backgroundColor: '#fff',
+      borderRadius: '12px',
+      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+      border: '1px solid #dadce0',
+      boxSizing: 'border-box'
+    },
+    titulo: {
+      color: '#1a73e8',
+      fontSize: '22px',
+      fontWeight: 'bold',
+      margin: '0 0 25px 0',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    },
+    formGroup: {
+      display: 'grid',
+      gap: '8px',
+      marginBottom: '20px'
+    },
+    label: {
+      fontSize: '14px',
+      fontWeight: '500',
+      color: '#333'
+    },
+    input: {
+      width: '100%',
+      padding: '10px 12px',
+      fontSize: '15px',
+      color: '#000',
+      backgroundColor: '#fff',
+      border: '1px solid #ccc',
+      borderRadius: '6px',
+      boxSizing: 'border-box',
+      outline: 'none',
+      transition: 'border-color 0.2s'
+    },
+    textarea: {
+      width: '100%',
+      padding: '10px 12px',
+      fontSize: '15px',
+      color: '#000',
+      backgroundColor: '#fff',
+      border: '1px solid #ccc',
+      borderRadius: '6px',
+      boxSizing: 'border-box',
+      outline: 'none',
+      height: '100px',
+      resize: 'none',
+      fontFamily: 'inherit'
+    },
+    botao: {
+      width: '100%',
+      padding: '12px',
+      fontSize: '16px',
+      fontWeight: 'bold',
+      color: '#fff',
+      backgroundColor: loading ? '#max-w-2xl' : '#1a73e8',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: loading ? 'not-allowed' : 'pointer',
+      transition: 'background-color 0.2s',
+      marginTop: '10px'
+    },
+    mensagemSucesso: {
+      padding: '12px',
+      borderRadius: '6px',
+      backgroundColor: '#e6f4ea',
+      color: '#137333',
+      border: '1px solid #c2e7cb',
+      marginBottom: '20px',
+      fontWeight: '500'
+    },
+    mensagemErro: {
+      padding: '12px',
+      borderRadius: '6px',
+      backgroundColor: '#fce8e6',
+      color: '#c5221f',
+      border: '1px solid #fad2cf',
+      marginBottom: '20px',
+      fontWeight: '500'
+    }
+  };
+
   return (
-    <div className="p-6 max-w-2xl mx-auto bg-white rounded-lg shadow-md border border-gray-200 mt-10">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+    <div style={styles.container}>
+      <h2 style={styles.titulo}>
         📦 Transferência de Materiais (Movimentação)
       </h2>
 
       {mensagem.texto && (
-        <div className={`p-3 rounded mb-4 ${mensagem.tipo === 'sucesso' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+        <div style={mensagem.tipo === 'sucesso' ? styles.mensagemSucesso : styles.mensagemErro}>
+          {mensagem.tipo === 'sucesso' ? '✅ ' : '❌ '}
           {mensagem.texto}
         </div>
       )}
 
-      <form onSubmit={handleTransferir} className="space-y-4">
+      <form onSubmit={handleTransferir}>
         {/* Select de Materiais */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Selecione o Material</label>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Selecione o Material</label>
           <select
             value={materialSelecionado}
             onChange={(e) => setMaterialSelecionado(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-black"
+            style={styles.input}
           >
             <option value="">-- Escolha um material --</option>
             {materiais.map(m => (
-              <option key={m.id} value={m.id}>{m.nome} (Qtd: {m.quantidade})</option>
+              <option key={m.id} value={m.id}>{m.nome} (Qtd: {m.quantidade || 0})</option>
             ))}
           </select>
         </div>
 
         {/* Select de Destino */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Local de Destino</label>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Local de Destino</label>
           <select
             value={localDestino}
             onChange={(e) => setLocalDestino(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-black"
+            style={styles.input}
           >
             <option value="">-- Escolha o destino --</option>
             {locais.map(l => (
@@ -111,13 +205,13 @@ export default function AprovacaoMovimentacao() {
         </div>
 
         {/* Campo de Observação */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Observação (Opcional)</label>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Observação (Opcional)</label>
           <textarea
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
             placeholder="Ex: Transferência para manutenção, troca de setor..."
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-black h-24 resize-none"
+            style={styles.textarea}
           />
         </div>
 
@@ -125,7 +219,10 @@ export default function AprovacaoMovimentacao() {
         <button
           type="submit"
           disabled={loading}
-          className={`w-full text-white p-2.5 rounded font-medium transition-colors ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+          style={{
+            ...styles.botao,
+            backgroundColor: loading ? '#b8b8b8' : '#1a73e8'
+          }}
         >
           {loading ? 'Processando...' : 'Confirmar Transferência'}
         </button>

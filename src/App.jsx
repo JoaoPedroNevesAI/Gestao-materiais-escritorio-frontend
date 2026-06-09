@@ -5,7 +5,6 @@ import Login from './components/Login';
 import AprovacaoMovimentacao from './components/AprovacaoMovimentacao';
 import ListaAcessos from './components/ListaAcessos';
 import { ToastContainer, toast } from 'react-toastify';
-import { jwtDecode } from 'jwt-decode'; 
 import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -24,8 +23,11 @@ function App() {
   const [locais, setLocais] = useState([]); 
   const [itemParaEditar, setItemParaEditar] = useState(null);
   
-  // ESTADO ADICIONADO: Controla qual aba está ativa na tela
+  // Controla qual aba está ativa na tela
   const [abaAtiva, setAbaAtiva] = useState('inventario'); 
+
+  // Função auxiliar para verificar se o usuário é Administrador de forma flexível (ROLE_ADM ou ADM)
+  const ehAdmin = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
 
   useEffect(() => {
     if (usuarioLogado) {
@@ -44,6 +46,8 @@ function App() {
   }, [usuarioLogado]);
 
   const handleLogin = (dadosDoLogin) => {
+    console.log("RECEBI NO APP:", dadosDoLogin);
+
     if (!dadosDoLogin) {
       toast.error("Erro na autenticação: Resposta vazia.");
       return;
@@ -56,49 +60,27 @@ function App() {
       return;
     }
 
-    try {
-      const payloadDecodificado = jwtDecode(tokenString);
-      const emailUsuario = payloadDecodificado.sub || '';
-      
-      if (!emailUsuario) {
-        toast.error("Token válido, mas sem identificação do usuário (sub).");
-        return;
-      }
+    const nomeUsuario = dadosDoLogin.nome || 'Usuário';
+    const roleUsuario = dadosDoLogin.role || 'ROLE_CLIENTE';
 
-      let roleFormatada = 'ROLE_CLIENTE';
-      if (payloadDecodificado.authorities) {
-        if (Array.isArray(payloadDecodificado.authorities)) {
-          roleFormatada = payloadDecodificado.authorities[0] || 'ROLE_CLIENTE';
-        } else if (typeof payloadDecodificado.authorities === 'string') {
-          roleFormatada = payloadDecodificado.authorities;
-        }
-      }
+    const sessaoUsuario = {
+      token: tokenString,
+      nome: nomeUsuario, 
+      role: roleUsuario
+    };
 
-      const nomeUsuarioRaw = emailUsuario ? emailUsuario.split('@')[0] : 'Usuário';
-      const nomeFormatado = nomeUsuarioRaw.charAt(0).toUpperCase() + nomeUsuarioRaw.slice(1);
-
-      const sessaoUsuario = {
-        token: tokenString,
-        nome: nomeFormatado, 
-        role: roleFormatada
-      };
-
-      setUsuarioLogado(sessaoUsuario);
-      localStorage.setItem('usuario_patrimonio', JSON.stringify(sessaoUsuario));
-      localStorage.setItem('token', tokenString); 
-      
-      toast.success(`Bem-vindo, ${nomeFormatado}!`);
-    } catch (err) {
-      console.error("Erro crítico ao decodificar token de autenticação:", err);
-      toast.error("Erro ao processar as credenciais do Token.");
-    }
+    setUsuarioLogado(sessaoUsuario);
+    localStorage.setItem('usuario_patrimonio', JSON.stringify(sessaoUsuario));
+    localStorage.setItem('token', tokenString); 
+    
+    toast.success(`Bem-vindo, ${nomeUsuario}!`);
   };
 
   const handleLogout = () => {
     setUsuarioLogado(null);
     localStorage.removeItem('usuario_patrimonio');
     localStorage.removeItem('token'); 
-    setAbaAtiva('inventario'); // Reseta a aba ao deslogar
+    setAbaAtiva('inventario'); 
     toast.info("Sessão encerrada.");
   };
 
@@ -122,7 +104,7 @@ function App() {
 
   const prepararEdicao = (item) => {
     setItemParaEditar(item);
-    setAbaAtiva('inventario'); // Garante que volta para a aba do formulário para editar
+    setAbaAtiva('inventario'); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -234,7 +216,6 @@ function App() {
             </div>
           </div>
 
-          {/* MENU DE ABAS CORRIGIDO COM ESTILO DINÂMICO */}
           <nav style={{ marginTop: '20px', borderBottom: `1px solid ${themeStyles.borderColor}`, display: 'flex', gap: '10px' }}>
             <button 
               onClick={() => setAbaAtiva('inventario')}
@@ -249,7 +230,8 @@ function App() {
               📦 Inventário
             </button>
             
-            {usuarioLogado.role === 'ROLE_ADM' && (
+            {/* CORRIGIDO: Checagem flexível de ADM */}
+            {ehAdmin && (
               <button 
                 onClick={() => setAbaAtiva('transferencia')}
                 style={{ 
@@ -266,10 +248,10 @@ function App() {
           </nav>
         </header>
 
-        {/* EXIBIÇÃO CONDICIONAL DAS TELAS BASEADA NA ABA SELECIONADA */}
         {abaAtiva === 'inventario' ? (
           <>
-            {usuarioLogado.role === 'ROLE_ADM' && (
+            {/* CORRIGIDO: Checagem flexível de ADM */}
+            {ehAdmin && (
               <Formulario 
                 aoAdicionar={salvarOuAtualizarBem} 
                 bemParaEditar={itemParaEditar} 
@@ -334,12 +316,12 @@ function App() {
             </div>
           </>
         ) : (
-          /* RENDERIZAÇÃO DA SUA NOVA TELA DE MOVIMENTAÇÃO/TRANSFERÊNCIA */
           <AprovacaoMovimentacao />
         )}
       </div>
 
-      {usuarioLogado.role === 'ROLE_ADM' && (
+      {/* CORRIGIDO: Checagem flexível de ADM */}
+      {ehAdmin && (
         <div style={{ 
           width: '300px', 
           position: 'sticky', 
@@ -348,7 +330,6 @@ function App() {
           borderLeft: `1px solid ${themeStyles.borderColor}`, 
           backgroundColor: themeStyles.cardBg 
         }}>
-          <SidebarAcessos /> {/* Tratando ListaAcessos se necessário */}
           <ListaAcessos darkMode={darkMode} />
         </div>
       )}
