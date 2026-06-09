@@ -87,10 +87,14 @@ function App() {
   const salvarOuAtualizarBem = async (dadosMaterial) => {
     try {
       if (itemParaEditar) {
-        const updated = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
-        setBens(bens.map(b => b.id === itemParaEditar.id ? updated : b));
+        // Envia a atualização para o Back-end
+        await atualizarMaterial(itemParaEditar.id, dadosMaterial);
         toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
+        
+        // CORREÇÃO: Busca a lista atualizada direto do banco para evitar sumir itens pelos filtros
+        const listaAtualizada = await listarMateriais();
+        setBens(listaAtualizada);
       } else {
         const materialComUsuario = { ...dadosMaterial, cadastradoPor: usuarioLogado.nome };
         const novo = await salvarMaterial(materialComUsuario);
