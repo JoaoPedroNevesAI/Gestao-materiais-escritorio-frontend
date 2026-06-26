@@ -6,6 +6,10 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   const [categorias, setCategorias] = useState([]);
   const [locais, setLocais] = useState([]); 
   
+  // ESTADOS: Guardam o arquivo real selecionado e a URL temporária para o preview visual
+  const [imagemArquivo, setImagemArquivo] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+
   const [formData, setFormData] = useState({
     nome: '',
     descricao: '',
@@ -13,7 +17,6 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     categoriaId: '',
     localId: '', 
     valor: '',
-    imagemUrl: '',
     dataAquisicao: '',
     dataLimiteManutencao: ''
   });
@@ -42,10 +45,12 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         categoriaId: bemParaEditar.categoria?.id || '',
         localId: bemParaEditar.local?.id || '', 
         valor: bemParaEditar.valor || '',
-        imagemUrl: bemParaEditar.imagemUrl || '',
         dataAquisicao: bemParaEditar.dataAquisicao ? bemParaEditar.dataAquisicao.split('T')[0] : '',
         dataLimiteManutencao: bemParaEditar.dataLimiteManutencao ? bemParaEditar.dataLimiteManutencao.split('T')[0] : ''
       });
+      // Se já houver uma imagem salva no servidor do João, renderiza apontando para o recurso estático
+      setImagePreview(bemParaEditar.imagem ? `http://localhost:8080/uploads/${bemParaEditar.imagem}` : '');
+      setImagemArquivo(null);
     } else {
       limparCampos();
     }
@@ -54,13 +59,24 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   const limparCampos = () => {
     setFormData({
       nome: '', descricao: '', quantidade: '', categoriaId: '',
-      localId: '', valor: '', imagemUrl: '', dataAquisicao: '', dataLimiteManutencao: ''
+      localId: '', valor: '', dataAquisicao: '', dataLimiteManutencao: ''
     });
+    setImagemArquivo(null);
+    setImagePreview('');
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Trata a seleção do arquivo binário e monta o preview dinâmico no front-end
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImagemArquivo(file);
+      setImagePreview(URL.createObjectURL(file)); 
+    }
   };
 
   // --- FUNÇÕES DE CRIAÇÃO RÁPIDA ---
@@ -95,27 +111,27 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // CORREÇÃO: Montando o objeto exatamente como a classe MaterialRequest exige no Spring
+    // Montando o objeto estruturado exatamente como a classe MaterialRequest exige no Spring
     const materialFormatado = {
       id: bemParaEditar?.id || null, 
       nome: formData.nome,
       descricao: formData.descricao,
       quantidade: parseInt(formData.quantidade) || 0,
       valor: formData.valor ? parseFloat(formData.valor) : 0.0, 
-      imagemUrl: formData.imagemUrl || '',
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
       
-      // Enviando os IDs numéricos soltos na raiz para passar pelo @NotNull
+      // Enviando os IDs numéricos soltos na raiz para passar pelo @NotNull do DTO
       categoriaId: formData.categoriaId ? parseInt(formData.categoriaId) : null,
       localId: formData.localId ? parseInt(formData.localId) : null,
 
-      // Mantidos aqui em paralelo caso a entidade exija herança reversa no salvamento direto
+      // Mantidos aqui em paralelo por segurança de herança
       categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
       local: formData.localId ? { id: parseInt(formData.localId) } : null
     };
 
-    aoAdicionar(materialFormatado);
+    // Repassa o JSON do material e o arquivo real em binário para a função gerenciadora
+    aoAdicionar(materialFormatado, imagemArquivo);
     if (!bemParaEditar) limparCampos();
   };
 
@@ -276,26 +292,68 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
           />
         </div>
 
-        {/* URL da Imagem */}
-        <div style={{ gridColumn: 'span 2' }}>
-          <input 
-            name="imagemUrl"
-            value={formData.imagemUrl}
-            onChange={handleChange}
-            placeholder="URL da imagem (opcional)"
-            style={styles.input}
-          />
+        {/* SEÇÃO DE UPLOAD CUSTOMIZADA */}
+        <div style={{ gridColumn: 'span 2', display: 'grid', gap: '8px' }}>
+          <label style={styles.label}>Imagem Real do Patrimônio (Formatos: PNG, JPG) 📁</label>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {/* Input real invisível, disparado pela label acoplada via htmlFor */}
+            <input 
+              type="file" 
+              id="upload-imagem"
+              accept="image/*"
+              onChange={handleFileChange} 
+              style={{ display: 'none' }} 
+            />
+            
+            <label 
+              htmlFor="upload-imagem" 
+              style={{
+                padding: '10px 16px',
+                backgroundColor: darkMode ? '#2d2d2d' : '#f0f2f5',
+                color: darkMode ? '#fff' : '#333',
+                border: `1px dashed ${darkMode ? '#555' : '#ccc'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = darkMode ? '#3d3d3d' : '#e4e6e9'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = darkMode ? '#2d2d2d' : '#f0f2f5'}
+            >
+              📷 {imagemArquivo ? 'Alterar Imagem' : 'Selecionar Imagem'}
+            </label>
+
+            {/* Texto dinâmico com o nome do arquivo anexado */}
+            <span style={{ fontSize: '13px', color: darkMode ? '#aaa' : '#666', fontStyle: 'italic' }}>
+              {imagemArquivo ? imagemArquivo.name : 'Nenhum arquivo selecionado'}
+            </span>
+          </div>
         </div>
 
-        {/* Preview da Imagem */}
-        {formData.imagemUrl && (
-          <div style={{ gridColumn: 'span 2', textAlign: 'center', marginTop: '5px' }}>
-            <img 
-              src={formData.imagemUrl} 
-              alt="Preview" 
-              onError={(e) => e.target.style.display = 'none'}
-              style={{ width: '120px', maxHeight: '120px', objectFit: 'cover', borderRadius: '8px', border: `1px solid ${darkMode ? '#444' : '#eee'}` }} 
-            />
+        {/* PREVIEW OTIMIZADO */}
+        {imagePreview && (
+          <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+            <div style={{ position: 'relative', border: `2px solid #1a73e8`, borderRadius: '12px', padding: '4px', backgroundColor: darkMode ? '#1e1e1e' : '#fff' }}>
+              <img 
+                src={imagePreview} 
+                alt="Preview" 
+                onError={(e) => e.target.style.display = 'none'}
+                style={{ 
+                  width: '140px', 
+                  height: '140px', 
+                  objectFit: 'cover', 
+                  borderRadius: '8px' 
+                }} 
+              />
+              <div style={{ position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#1a73e8', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                PRÉ-VISUALIZAÇÃO
+              </div>
+            </div>
           </div>
         )}
 
@@ -312,7 +370,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
             borderRadius: '8px',
             color: '#fff',
             cursor: 'pointer',
-            marginTop: '5px'
+            marginTop: '15px'
           }}
         >
           {bemParaEditar ? 'Salvar Alterações' : 'Registrar Patrimônio'}

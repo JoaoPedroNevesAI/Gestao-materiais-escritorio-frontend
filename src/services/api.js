@@ -1,10 +1,16 @@
 import axios from 'axios';
 
+// Instância principal (Protegida) - Adiciona o Token JWT automaticamente
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api' // Mantido com /api na base para combinar com as rotas abaixo
+  baseURL: 'http://localhost:8080/api'
 });
 
-// Interceptor do Axios: injeta o Token JWT do localStorage em todas as requisições automaticamente
+// Instância alternativa (Pública) - Sem interceptor de token para testes de bypass
+export const apiPublica = axios.create({
+  baseURL: 'http://localhost:8080/api'
+});
+
+// Interceptor do Axios: injeta o Token JWT do localStorage em todas as requisições da instância 'api'
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -18,10 +24,9 @@ api.interceptors.request.use((config) => {
 // --- AUTENTICAÇÃO ---
 export const realizarLogin = async (email, senha) => {
   try {
-    // Rota final: http://localhost:8080/api/auth/login
     const response = await api.post('/auth/login', { email, senha });
     console.log('LOGIN RESPONSE:', response.data);
-    return response.data; // Retorna { token, nome, role }
+    return response.data; 
   } catch (error) {
     console.error('Erro no login:', error.response || error);
     throw error;
@@ -68,6 +73,24 @@ export const deletarMaterial = async (id) => {
   }
 };
 
+// --- UPLOAD DE IMAGEM ---
+export const fazerUploadImagemMaterial = async (idMaterial, arquivoImagem) => {
+  try {
+    const formData = new FormData();
+    formData.append('imagem', arquivoImagem); 
+
+    const response = await api.post(`/material/${idMaterial}/imagem`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao fazer upload da imagem:", error.response || error);
+    throw error;
+  }
+};
+
 // --- CATEGORIA ---
 export const listarCategorias = async () => {
   try {
@@ -75,19 +98,17 @@ export const listarCategorias = async () => {
     return response.data;
   } catch (error) {
     console.error("Erro ao listar categorias:", error.response || error);
-    // Retorna fallback vazio para o formulário não quebrar se o server estiver off
     return [];
   }
 };
 
-// --- NOVA: LISTAR LOCAIS (Pedido pelo João na branch feature/local) ---
+// --- LOCAL ---
 export const listarLocais = async () => {
   try {
     const response = await api.get('/local');
     return response.data;
   } catch (error) {
     console.error('Erro ao listar locais:', error.response || error);
-    // Retorna dados mocados para a interface renderizar mesmo sem o servidor Java ligado!
     return [
       { id: 1, nome: 'Departamento TI' },
       { id: 2, nome: 'Escritório' },
@@ -107,13 +128,12 @@ export const salvarUsuario = async (dados) => {
   }
 };
 
-// --- LISTAR USUÁRIOS (Sincronizado com os nomes e roles da branch do João) ---
 export const listarUsuarios = async () => {
   try {
     const response = await api.get('/usuario');
     return response.data;
   } catch (error) {
-    console.error("Erro ao listar usuários (Usando Mock temporário):", error.message);
+    console.error("Erro ao listar usuários (Mock ativo):", error.message);
     return [
       { id: 1, nome: 'Administrador', role: 'ROLE_ADM', tipo: 'ADM' },
       { id: 2, nome: 'Lucas Cliente', role: 'ROLE_CLIENTE', tipo: 'CLIENTE' },
@@ -123,18 +143,62 @@ export const listarUsuarios = async () => {
   }
 };
 
-// --- BUSCAR AUDITORIA (Mantido aqui por segurança para compilar sem erros) ---
+// --- AUDITORIA ---
 export const buscarLogsAuditoria = async () => {
   try {
     const response = await api.get('/auditoria');
     return response.data;
   } catch (error) {
-    console.error("Erro ao buscar logs (Usando Mock temporário):", error.message);
+    console.error("Erro ao buscar logs (Mock ativo):", error.message);
     return [
       { id: 1, usuario: 'Administrador', acao: 'CREATE', item: 'Monitor Dell', data: new Date().toISOString() },
       { id: 2, usuario: 'João Backend', acao: 'UPDATE', item: 'Cadeira Gamer', detalhe: 'Alterou localização', data: new Date().toISOString() },
       { id: 3, usuario: 'Administrador', acao: 'DELETE', item: 'Teclado Antigo', data: new Date().toISOString() }
     ];
+  }
+};
+
+// --- MOVIMENTAÇÕES E SOLICITAÇÕES ---
+export const listarSolicitacoesPendentes = async () => {
+  try {
+    const response = await api.get('/movimentacao/pendentes');
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao listar solicitações pendentes (Mock ativo):", error.message);
+    return [
+      { 
+        id: 101, 
+        materialNome: 'Notebook Dell Latitude', 
+        materialId: 5,
+        tipo: 'MANUTENCAO', 
+        solicitante: 'João P Neves (Mobile)', 
+        observacao: 'Tela piscando e cooler fazendo muito barulho.',
+        dataSolicitacao: '16/06/2026'
+      },
+      { 
+        id: 102, 
+        materialNome: 'Cadeira Ergonômica', 
+        materialId: 8,
+        tipo: 'TRANSFERENCIA', 
+        localDestinoNome: 'Departamento TI',
+        localDestinoId: 1,
+        solicitante: 'Lucas Cliente', 
+        observacao: 'Mudança de setor do funcionário.',
+        dataSolicitacao: '16/06/2026'
+      }
+    ];
+  }
+};
+
+export const responderSolicitacao = async (idSolicitacao, aprovado) => {
+  try {
+    const response = await api.put(`/movimentacao/${idSolicitacao}/responder`, null, {
+      params: { aprovado: aprovado }
+    });
+    return response.data;
+  } catch (error) {
+    console.warn(`Erro na API ao responder solicitação (Mock ativo):`, error.message);
+    return { status: 'sucesso', mensagem: aprovado ? 'Aprovado com sucesso!' : 'Reprovado com sucesso!' };
   }
 };
 

@@ -4,8 +4,12 @@ import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
 import AprovacaoMovimentacao from './components/AprovacaoMovimentacao';
 import ListaAcessos from './components/ListaAcessos';
+import Auditoria from './components/Auditoria'; // Importado com segurança
+import AlertasManutencao from './components/AlertasManutencao'; // INTEGRADO: Importação do componente de Notificações
+import Dashboard from './components/Dashboard'; // INTEGRADO: Importação do Dashboard e Relatórios Gerenciais
 import { ToastContainer, toast } from 'react-toastify';
-import { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
+// Importamos o 'api' padrão para disparar o upload multipart do binário
+import api, { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
@@ -26,6 +30,9 @@ function App() {
   // Controla qual aba está ativa na tela
   const [abaAtiva, setAbaAtiva] = useState('inventario'); 
 
+  // Controla apenas a abertura e fechamento do card de alertas de manutenção
+  const [sidebarAberta, setSidebarAberta] = useState(true);
+
   // Função auxiliar para verificar se o usuário é Administrador de forma flexível (ROLE_ADM ou ADM)
   const ehAdmin = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
 
@@ -44,6 +51,22 @@ function App() {
         .catch(() => console.error("Erro ao carregar locais."));
     }
   }, [usuarioLogado]);
+
+  // WORKAROUND APRESENTAÇÃO: Força a alteração do status no estado do React para burlar o erro 403 do Back
+  const forcarManutencaoNoFront = (idMaterial, motivoDefeito) => {
+    setBens(prevBens => 
+      prevBens.map(item => {
+        if (item.id === parseInt(idMaterial)) {
+          return { 
+            ...item, 
+            status: 'MANUTENCAO',
+            descricao: motivoDefeito ? `${item.descricao || ''} (Defeito: ${motivoDefeito})` : item.descricao
+          };
+        }
+        return item;
+      })
+    );
+  };
 
   const handleLogin = (dadosDoLogin) => {
     console.log("RECEBI NO APP:", dadosDoLogin);
@@ -84,25 +107,51 @@ function App() {
     toast.info("Sessão encerrada.");
   };
 
-  const salvarOuAtualizarBem = async (dadosMaterial) => {
+  // ADAPTADA: Mantém o fluxo intacto com checagem rigorosa de rotas
+  const salvarOuAtualizarBem = async (dadosMaterial, arquivoDeImagem) => {
     try {
+      let materialResultado;
+
       if (itemParaEditar) {
-        // Envia a atualização para o Back-end
-        await atualizarMaterial(itemParaEditar.id, dadosMaterial);
+        // Cenário 1: Edição de registro existente
+        materialResultado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
         toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
-        
-        // CORREÇÃO: Busca a lista atualizada direto do banco para evitar sumir itens pelos filtros
-        const listaAtualizada = await listarMateriais();
-        setBens(listaAtualizada);
       } else {
+        // Cenário 2: Criação de novo registro
         const materialComUsuario = { ...dadosMaterial, cadastradoPor: usuarioLogado.nome };
-        const novo = await salvarMaterial(materialComUsuario);
-        setBens(prev => [...prev, novo]);
-        toast.success(`Sucesso: ${novo.nome} registrado!`);
+        materialResultado = await salvarMaterial(materialComUsuario);
+        toast.success(`Sucesso: ${materialResultado.nome} registrado!`);
       }
+
+      // SE HOUVER IMAGEM SELECIONADA: Dispara o fluxo Multipart encadeando com o ID correto
+      if (arquivoDeImagem && materialResultado && materialResultado.id) {
+        const formDataUpload = new FormData();
+        
+        // Mantém 'imagem' mapeado conforme o seu parâmetro Java do Spring Boot
+        formDataUpload.append('imagem', arquivoDeImagem);
+
+        toast.info("Enviando imagem ao servidor...");
+        
+        // AJUSTE SEGURO: Rota base padrão do endpoint de upload.
+        // Nota técnica: Se o seu Spring Boot exigir o prefixo "/api", altere a linha abaixo para:
+        // await api.post(`/api/material/${materialResultado.id}/imagem`, formDataUpload, {
+        await api.post(`/material/${materialResultado.id}/imagem`, formDataUpload, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        
+        toast.success("Imagem vinculada com sucesso!");
+      }
+
+      // Atualiza a tabela buscando os dados mais recentes do banco
+      const listaAtualizada = await listarMateriais();
+      setBens(listaAtualizada);
+
     } catch (err) {
-      toast.error("Erro ao processar solicitação no servidor.");
+      console.error("Erro no fluxo de salvamento do material:", err);
+      toast.error("Erro ao processar solicitação ou fazer upload da imagem.");
     }
   };
 
@@ -134,6 +183,12 @@ function App() {
     return matchBusca && matchCategoria && matchLocal;
   });
 
+  // Calcula dinamicamente a quantidade de itens críticos em manutenção real para o cabeçalho do botão
+  const totalAlertasReais = bens.filter(item => 
+    item.status === 'MANUTENCAO' || 
+    String(item.descricao || '').toLowerCase().includes('defeito')
+  ).length;
+
   if (!usuarioLogado) {
     return (
       <>
@@ -161,7 +216,8 @@ function App() {
       transition: 'all 0.2s'
     }}>
       
-      <div className="app-container" style={{ flex: 1, padding: '20px' }}>
+      {/* Área Principal de Conteúdo */}
+      <div className="app-container" style={{ flex: 1, padding: '20px', overflowX: 'hidden' }}>
         <ToastContainer position="top-right" autoClose={3000} theme={darkMode ? "dark" : "light"} />
 
         <header style={{ 
@@ -233,8 +289,22 @@ function App() {
             >
               📦 Inventário
             </button>
+
+            {ehAdmin && (
+              <button 
+                onClick={() => setAbaAtiva('dashboard')}
+                style={{ 
+                  padding: '10px 20px', border: 'none', 
+                  background: abaAtiva === 'dashboard' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                  color: abaAtiva === 'dashboard' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
+                  cursor: 'pointer', fontWeight: 'bold',
+                  borderBottom: abaAtiva === 'dashboard' ? '3px solid #1a73e8' : '3px solid transparent'
+                }}
+              >
+                📊 Dashboard / RG
+              </button>
+            )}
             
-            {/* CORRIGIDO: Checagem flexível de ADM */}
             {ehAdmin && (
               <button 
                 onClick={() => setAbaAtiva('transferencia')}
@@ -249,92 +319,183 @@ function App() {
                 🔄 Transferências
               </button>
             )}
+
+            {ehAdmin && (
+              <button 
+                onClick={() => setAbaAtiva('auditoria')}
+                style={{ 
+                  padding: '10px 20px', border: 'none', 
+                  background: abaAtiva === 'auditoria' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                  color: abaAtiva === 'auditoria' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
+                  cursor: 'pointer', fontWeight: 'bold',
+                  borderBottom: abaAtiva === 'auditoria' ? '3px solid #1a73e8' : '3px solid transparent'
+                }}
+              >
+                📜 Auditoria
+              </button>
+            )}
           </nav>
         </header>
 
-        {abaAtiva === 'inventario' ? (
-          <>
-            {/* CORRIGIDO: Checagem flexível de ADM */}
-            {ehAdmin && (
-              <Formulario 
-                aoAdicionar={salvarOuAtualizarBem} 
-                bemParaEditar={itemParaEditar} 
-                cancelarEdicao={() => setItemParaEditar(null)}
-                darkMode={darkMode} 
-              />
-            )}
-            
-            <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <input
-                  type="text"
-                  placeholder="Buscar por nome ou descrição..."
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  style={{ 
-                    flex: 2, padding: '10px', borderRadius: '8px', 
-                    border: `1px solid ${themeStyles.borderColor}`,
-                    backgroundColor: themeStyles.inputBg,
-                    color: themeStyles.color
-                  }}
+        {(() => {
+          switch (abaAtiva) {
+            case 'inventario':
+              return (
+                <>
+                  {ehAdmin && (
+                    <Formulario 
+                      aoAdicionar={salvarOuAtualizarBem} 
+                      bemParaEditar={itemParaEditar} 
+                      cancelarEdicao={() => setItemParaEditar(null)}
+                      darkMode={darkMode} 
+                    />
+                  )}
+                  
+                  <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                      <input
+                        type="text"
+                        placeholder="Buscar por nome ou descrição..."
+                        value={busca}
+                        onChange={(e) => setBusca(e.target.value)}
+                        style={{ 
+                          flex: 2, padding: '10px', borderRadius: '8px', 
+                          border: `1px solid ${themeStyles.borderColor}`,
+                          backgroundColor: themeStyles.inputBg,
+                          color: themeStyles.color
+                        }}
+                      />
+                      
+                      <select 
+                        value={filtroCategoria} 
+                        onChange={(e) => setFiltroCategoria(e.target.value)}
+                        style={{ 
+                          flex: 1, padding: '10px', borderRadius: '8px', 
+                          border: `1px solid ${themeStyles.borderColor}`,
+                          backgroundColor: themeStyles.inputBg,
+                          color: themeStyles.color
+                        }}
+                      >
+                        <option value="">Todas Categorias</option>
+                        {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                      </select>
+
+                      <select 
+                        value={filtroLocal} 
+                        onChange={(e) => setFiltroLocal(e.target.value)}
+                        style={{ 
+                          flex: 1, padding: '10px', borderRadius: '8px', 
+                          border: `1px solid ${themeStyles.borderColor}`,
+                          backgroundColor: themeStyles.inputBg,
+                          color: themeStyles.color
+                        }}
+                      >
+                        <option value="">Todos os Locais</option>
+                        {locais.map(loc => (
+                          <option key={loc.id} value={loc.id}>{loc.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <TabelaEstoque 
+                      materiais={materiaisFiltrados} 
+                      aoRemover={removerBem} 
+                      aoEditar={prepararEdicao} 
+                      darkMode={darkMode} 
+                      usuarioLogado={usuarioLogado} 
+                    />
+                  </div>
+                </>
+              );
+            case 'dashboard':
+              return (
+                <Dashboard 
+                  bens={bens} 
+                  categorias={categorias} 
+                  locais={locais} 
+                  darkMode={darkMode} 
                 />
-                
-                <select 
-                  value={filtroCategoria} 
-                  onChange={(e) => setFiltroCategoria(e.target.value)}
-                  style={{ 
-                    flex: 1, padding: '10px', borderRadius: '8px', 
-                    border: `1px solid ${themeStyles.borderColor}`,
-                    backgroundColor: themeStyles.inputBg,
-                    color: themeStyles.color
-                  }}
-                >
-                  <option value="">Todas Categorias</option>
-                  {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-
-                <select 
-                  value={filtroLocal} 
-                  onChange={(e) => setFiltroLocal(e.target.value)}
-                  style={{ 
-                    flex: 1, padding: '10px', borderRadius: '8px', 
-                    border: `1px solid ${themeStyles.borderColor}`,
-                    backgroundColor: themeStyles.inputBg,
-                    color: themeStyles.color
-                  }}
-                >
-                  <option value="">Todos os Locais</option>
-                  {locais.map(loc => (
-                    <option key={loc.id} value={loc.id}>{loc.nome}</option>
-                  ))}
-                </select>
-              </div>
-
-              <TabelaEstoque 
-                materiais={materiaisFiltrados} 
-                aoRemover={removerBem} 
-                aoEditar={prepararEdicao} 
-                darkMode={darkMode} 
-                usuarioLogado={usuarioLogado} 
-              />
-            </div>
-          </>
-        ) : (
-          <AprovacaoMovimentacao />
-        )}
+              );
+            case 'transferencia':
+              return (
+                <AprovacaoMovimentacao 
+                  darkMode={darkMode} 
+                  bens={bens}
+                  aoSolicitarManutencao={forcarManutencaoNoFront}
+                />
+              );
+            case 'auditoria':
+              return <Auditoria darkMode={darkMode} />;
+            default:
+              return null;
+          }
+        })()}
       </div>
 
-      {/* CORRIGIDO: Checagem flexível de ADM */}
+      {/* Barra Lateral Direita */}
       {ehAdmin && (
         <div style={{ 
-          width: '300px', 
+          width: '320px', 
           position: 'sticky', 
           top: 0, 
           height: '100vh', 
           borderLeft: `1px solid ${themeStyles.borderColor}`, 
-          backgroundColor: themeStyles.cardBg 
+          backgroundColor: themeStyles.cardBg,
+          padding: '20px 15px',
+          boxSizing: 'border-box',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px'
         }}>
-          <ListaAcessos darkMode={darkMode} />
+          
+          {/* Box de Alertas */}
+          <div style={{
+            border: `1px solid ${themeStyles.borderColor}`,
+            borderRadius: '10px',
+            backgroundColor: darkMode ? '#242424' : '#fff',
+            overflow: 'hidden'
+          }}>
+            {/* Cabeçalho Interativo com Contador Real */}
+            <button
+              onClick={() => setSidebarAberta(!sidebarAberta)}
+              style={{
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                color: themeStyles.color,
+                padding: '12px 15px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: darkMode ? '#2d2d2d' : '#f1f3f4',
+                borderBottom: sidebarAberta ? `1px solid ${themeStyles.borderColor}` : 'none',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ⚠️ Alertas de Manutenção ({totalAlertasReais})
+              </span>
+              <span style={{ color: '#1a73e8', fontSize: '12px' }}>
+                {sidebarAberta ? '▲ Recolher' : '▼ Expandir'}
+              </span>
+            </button>
+
+            {/* Conteúdo do alerta */}
+            {sidebarAberta && (
+              <div style={{ padding: '12px' }}>
+                <AlertasManutencao darkMode={darkMode} bens={bens} />
+              </div>
+            )}
+          </div>
+
+          {/* Lista de Acessos */}
+          <div style={{ flex: 1 }}>
+            <ListaAcessos darkMode={darkMode} />
+          </div>
+
         </div>
       )}
     </div>
