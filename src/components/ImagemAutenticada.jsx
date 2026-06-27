@@ -11,21 +11,35 @@ export default function ImagemAutenticada({ url, alt, darkMode, style }) {
     }
   }, [url]);
 
-  const estiloPadrao = style || {
+  // Aplica o novo design system de 8px arredondado por padrão
+  const estiloFinal = {
     width: '50px',
     height: '50px',
     objectFit: 'cover',
-    borderRadius: '6px',
-    display: 'block'
+    borderRadius: '8px', 
+    display: 'block',
+    ...style
   };
 
+  // Fallback Premium: Em vez de um SVG cru com texto, geramos um container estilizado com um ícone de caixa/patrimônio
   if (erro || !url) {
     return (
-      <img 
-        src={"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'><rect width='50' height='50' fill='%23" + (darkMode ? "222222" : "f0f0f0") + "'/><text x='50%25' y='55%25' font-family='Arial' font-size='10' fill='%23888888' dominant-baseline='middle' text-anchor='middle'>Sem Foto</text></svg>"}
-        alt={alt}
-        style={estiloPadrao}
-      />
+      <div 
+        style={{
+          ...estiloFinal,
+          backgroundColor: darkMode ? '#2d2d2d' : '#f1f3f4',
+          border: `1px solid ${darkMode ? '#444' : '#dadce0'}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '18px',
+          color: darkMode ? '#888' : '#aaa',
+          boxSizing: 'border-box'
+        }}
+        title={alt || "Item sem imagem"}
+      >
+        📦
+      </div>
     );
   }
 
@@ -33,7 +47,10 @@ export default function ImagemAutenticada({ url, alt, darkMode, style }) {
     <img 
       src={url} 
       alt={alt} 
-      style={estiloPadrao} 
+      style={{
+        ...estiloFinal,
+        border: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`
+      }} 
       onError={() => setErro(true)} 
     />
   );

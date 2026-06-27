@@ -18,7 +18,13 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
 
-  // Carrega estritamente o que vem do back-end do João
+  // Descobre o objeto do material selecionado atualmente para verificar o local dele
+  const materialAtual = (bens || []).find(b => b.id === Number(materialSelecionado));
+  
+  // Identifica o ID do local atual do bem (tentando mapear caminhos comuns como m.localId ou m.local?.id)
+  const idLocalAtualdoMaterial = materialAtual ? (materialAtual.localId || materialAtual.local?.id) : null;
+
+  // Carrega estritamente o que vem do back-end
   const carregarDadosIniciais = async () => {
     try {
       const [dadosLocais, dadosSolicitacoes] = await Promise.all([
@@ -40,13 +46,17 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     carregarDadosIniciais();
   }, []);
 
+  // Limpa o destino se o usuário mudar de material para evitar estados inconsistentes
+  useEffect(() => {
+    setLocalDestino('');
+  }, [materialSelecionado]);
+
   // Função para Aprovar ou Reprovar uma solicitação da tabela
   const handleDecidirSolicitacao = async (id, aprovado) => {
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
     
     try {
-      // Tenta enviar para o endpoint do Java
       await responderSolicitacao(id, aprovado);
       
       setMensagem({
@@ -61,7 +71,6 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         }
       }
 
-      // Remove da lista após o sucesso
       setSolicitacoes(prev => prev.filter(s => s.id !== id));
     } catch (err) {
       console.warn(`[AprovacaoMovimentacao] Erro ao responder ID ${id}. Aplicando contingência visual.`);
@@ -79,7 +88,6 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         aoSolicitarManutencao(sol.materialId, sol.observacao);
       }
 
-      // Remove localmente para manter a interface limpa
       setSolicitacoes(prev => prev.filter(s => s.id !== id));
     } finally {
       setLoading(false);
@@ -101,10 +109,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
 
-    // Busca os nomes nos arrays para montar o elemento visual temporário
-    const objetoMaterial = (bens || []).find(b => b.id === Number(materialSelecionado));
-    const nomeMaterial = objetoMaterial ? objetoMaterial.nome : "Material Selecionado";
-
+    const nomeMaterial = materialAtual ? materialAtual.nome : "Material Selecionado";
     const objetoLocal = locais.find(l => l.id === Number(localDestino));
     const nomeLocalDestino = objetoLocal ? objetoLocal.nome : "Novo Setor";
 
@@ -131,9 +136,8 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       carregarDadosIniciais();
       setMaterialSelecionado(''); setLocalDestino(''); setObservacao('');
     } catch (err) {
-      console.warn("[AprovacaoMovimentacao] Erro 500/404 no back. Injetando item localmente para demonstração na aba de pendentes.");
+      console.warn("[AprovacaoMovimentacao] Erro 500/404 no back. Injetando item localmente para demonstração.");
       
-      // GERAÇÃO DINÂMICA: Força o item a aparecer na lista para não quebrar a apresentação
       const novaSolicitacaoTemporaria = {
         id: Date.now(),
         solicitante: "Você (Web ADM)",
@@ -145,7 +149,6 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         localDestinoNome: tipoOperacao === 'TRANSFERENCIA' ? nomeLocalDestino : null
       };
 
-      // Alimenta a tabela em tempo de execução
       setSolicitacoes(prev => [novaSolicitacaoTemporaria, ...prev]);
 
       setMensagem({ 
@@ -162,35 +165,18 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
   // Estilização dinâmica
   const styles = {
     container: {
-      width: '100%',
-      maxWidth: '850px',
-      margin: '40px auto',
-      padding: '30px',
-      backgroundColor: darkMode ? '#1e1e1e' : '#fff',
-      borderRadius: '12px',
+      width: '100%', maxWidth: '850px', margin: '40px auto', padding: '30px',
+      backgroundColor: darkMode ? '#1e1e1e' : '#fff', borderRadius: '12px',
       boxShadow: darkMode ? '0 4px 20px rgba(0, 0, 0, 0.4)' : '0 4px 14px rgba(0, 0, 0, 0.08)',
-      border: `1px solid ${darkMode ? '#333' : '#dadce0'}`,
-      boxSizing: 'border-box',
-      color: darkMode ? '#e0e0e0' : '#333',
-      transition: 'all 0.2s'
+      border: `1px solid ${darkMode ? '#333' : '#dadce0'}`, boxSizing: 'border-box',
+      color: darkMode ? '#e0e0e0' : '#333', transition: 'all 0.2s'
     },
-    navAbas: {
-      display: 'flex',
-      gap: '10px',
-      marginBottom: '25px',
-      borderBottom: `2px solid ${darkMode ? '#333' : '#eee'}`
-    },
+    navAbas: { display: 'flex', gap: '10px', marginBottom: '25px', borderBottom: `2px solid ${darkMode ? '#333' : '#eee'}` },
     abaBtn: (ativa) => ({
-      padding: '10px 20px',
-      fontSize: '15px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      backgroundColor: 'transparent',
-      color: ativa ? '#1a73e8' : (darkMode ? '#aaa' : '#666'),
-      border: 'none',
-      borderBottom: ativa ? '3px solid #1a73e8' : '3px solid transparent',
-      marginBottom: '-2px',
-      transition: 'all 0.2s'
+      padding: '10px 20px', fontSize: '15px', fontWeight: '600', cursor: 'pointer',
+      backgroundColor: 'transparent', color: ativa ? '#1a73e8' : (darkMode ? '#aaa' : '#666'),
+      border: 'none', borderBottom: ativa ? '3px solid #1a73e8' : '3px solid transparent',
+      marginBottom: '-2px', transition: 'all 0.2s'
     }),
     formGroup: { display: 'grid', gap: '8px', marginBottom: '20px' },
     label: { fontSize: '14px', fontWeight: '500', color: darkMode ? '#aaa' : '#333' },
@@ -199,30 +185,20 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       color: darkMode ? '#fff' : '#000', backgroundColor: darkMode ? '#2d2d2d' : '#fff',
       border: `1px solid ${darkMode ? '#444' : '#ccc'}`, borderRadius: '6px', boxSizing: 'border-box'
     },
-    tabela: {
-      width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '14px'
-    },
+    tabela: { width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '14px' },
     th: {
       textAlign: 'left', padding: '12px', backgroundColor: darkMode ? '#2d2d2d' : '#f8f9fa',
       borderBottom: `2px solid ${darkMode ? '#444' : '#eee'}`, color: darkMode ? '#bbb' : '#555'
     },
-    td: {
-      padding: '12px', borderBottom: `1px solid ${darkMode ? '#333' : '#eee'}`
-    },
+    td: { padding: '12px', borderBottom: `1px solid ${darkMode ? '#333' : '#eee'}` },
     badge: (tipo) => ({
       padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold',
       backgroundColor: tipo === 'MANUTENCAO' ? '#fff0f0' : '#e6f4ea',
       color: tipo === 'MANUTENCAO' ? '#d93025' : '#137333',
       border: `1px solid ${tipo === 'MANUTENCAO' ? '#fad2cf' : '#c2e7cb'}`
     }),
-    btnAprovar: {
-      backgroundColor: '#137333', color: '#fff', border: 'none', padding: '6px 12px',
-      borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginRight: '5px'
-    },
-    btnReprovar: {
-      backgroundColor: '#d93025', color: '#fff', border: 'none', padding: '6px 12px',
-      borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
-    }
+    btnAprovar: { backgroundColor: '#137333', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginRight: '5px' },
+    btnReprovar: { backgroundColor: '#d93025', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }
   };
 
   return (
@@ -290,20 +266,8 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                         )}
                       </td>
                       <td style={styles.td}>
-                        <button 
-                          disabled={loading} 
-                          onClick={() => handleDecidirSolicitacao(sol.id, true)} 
-                          style={styles.btnAprovar}
-                        >
-                          Aprovar
-                        </button>
-                        <button 
-                          disabled={loading} 
-                          onClick={() => handleDecidirSolicitacao(sol.id, false)} 
-                          style={styles.btnReprovar}
-                        >
-                          Recusar
-                        </button>
+                        <button disabled={loading} onClick={() => handleDecidirSolicitacao(sol.id, true)} style={styles.btnAprovar}>Aprovar</button>
+                        <button disabled={loading} onClick={() => handleDecidirSolicitacao(sol.id, false)} style={styles.btnReprovar}>Recusar</button>
                       </td>
                     </tr>
                   ))}
@@ -347,9 +311,13 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
               <label style={styles.label}>Local de Destino</label>
               <select value={localDestino} onChange={(e) => setLocalDestino(e.target.value)} style={styles.input}>
                 <option value="" style={{color: darkMode ? '#fff' : '#000'}}>-- Escolha o destino --</option>
-                {locais.map(l => (
-                  <option key={l.id} value={l.id} style={{color: darkMode ? '#fff' : '#000'}}>{l.nome}</option>
-                ))}
+                {locais
+                  // FILTRO CRUCIAL: Remove o local correspondente onde o item já está alocado
+                  .filter(l => l.id !== Number(idLocalAtualdoMaterial))
+                  .map(l => (
+                    <option key={l.id} value={l.id} style={{color: darkMode ? '#fff' : '#000'}}>{l.nome}</option>
+                  ))
+                }
               </select>
             </div>
           )}

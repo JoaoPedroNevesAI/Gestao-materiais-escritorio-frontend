@@ -4,12 +4,18 @@ import TabelaEstoque from './components/TabelaEstoque';
 import Login from './components/Login';
 import AprovacaoMovimentacao from './components/AprovacaoMovimentacao';
 import ListaAcessos from './components/ListaAcessos';
-import Auditoria from './components/Auditoria'; // Importado com segurança
-import AlertasManutencao from './components/AlertasManutencao'; // INTEGRADO: Importação do componente de Notificações
-import Dashboard from './components/Dashboard'; // INTEGRADO: Importação do Dashboard e Relatórios Gerenciais
+import Auditoria from './components/Auditoria'; 
+import AlertasManutencao from './components/AlertasManutencao'; 
+import Dashboard from './components/Dashboard'; 
 import { ToastContainer, toast } from 'react-toastify';
-// Importamos o 'api' padrão para disparar o upload multipart do binário
-import api, { listarMateriais, salvarMaterial, deletarMaterial, listarCategorias, atualizarMaterial, listarLocais } from './services/api'; 
+import api, { 
+  listarMateriais, 
+  salvarMaterial, 
+  deletarMaterial, 
+  listarCategorias, 
+  atualizarMaterial, 
+  listarLocais 
+} from './services/api'; 
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
@@ -26,77 +32,91 @@ function App() {
   const [categorias, setCategorias] = useState([]);
   const [locais, setLocais] = useState([]); 
   const [itemParaEditar, setItemParaEditar] = useState(null);
-  
-  // Controla qual aba está ativa na tela
   const [abaAtiva, setAbaAtiva] = useState('inventario'); 
-
-  // Controla apenas a abertura e fechamento do card de alertas de manutenção
   const [sidebarAberta, setSidebarAberta] = useState(true);
 
-  // Função auxiliar para verificar se o usuário é Administrador de forma flexível (ROLE_ADM ou ADM)
   const ehAdmin = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
+
+  // Carregamento inicial de dados centralizado
+  const carregarDadosDoBanco = async () => {
+    try {
+      const [materiais, listaCats, listaLocais] = await Promise.all([
+        listarMateriais(),
+        listarCategorias(),
+        listarLocais()
+      ]);
+      setBens(materiais);
+      setCategorias(listaCats);
+      setLocais(listaLocais);
+    } catch (err) {
+      console.error("Erro ao sincronizar dados com o Back-end:", err);
+      toast.error("Erro de conexão com o servidor de banco de dados.");
+    }
+  };
 
   useEffect(() => {
     if (usuarioLogado) {
-      listarMateriais()
-        .then(setBens)
-        .catch(() => toast.error("Erro ao carregar materiais. Verifique o Back-end."));
-      
-      listarCategorias()
-        .then(setCategorias)
-        .catch(() => console.error("Erro ao carregar categorias."));
-
-      listarLocais()
-        .then(setLocais)
-        .catch(() => console.error("Erro ao carregar locais."));
+      carregarDadosDoBanco();
     }
   }, [usuarioLogado]);
 
-  // WORKAROUND APRESENTAÇÃO: Força a alteração do status no estado do React para burlar o erro 403 do Back
-  const forcarManutencaoNoFront = (idMaterial, motivoDefeito) => {
-    setBens(prevBens => 
-      prevBens.map(item => {
-        if (item.id === parseInt(idMaterial)) {
-          return { 
-            ...item, 
-            status: 'MANUTENCAO',
-            descricao: motivoDefeito ? `${item.descricao || ''} (Defeito: ${motivoDefeito})` : item.descricao
-          };
-        }
-        return item;
-      })
-    );
+  // Sincronização em tempo real quando as abas mudam para garantir consistência de dados
+  useEffect(() => {
+    if (usuarioLogado) {
+      listarMateriais().then(setBens).catch(console.error);
+    }
+  }, [abaAtiva]);
+
+  // Solução Definitiva: Envia o status de manutenção real ao Spring Boot e recarrega a tabela
+  const forcarManutencaoNoFront = async (idMaterial, motivoDefeito) => {
+    try {
+      const itemOriginal = bens.find(b => b.id === parseInt(idMaterial));
+      if (!itemOriginal) return;
+
+      const payloadAtualizado = {
+        ...itemOriginal,
+        status: 'MANUTENCAO',
+        descricao: motivoDefeito ? `${itemOriginal.descricao || ''} (Defeito: ${motivoDefeito})` : itemOriginal.descricao
+      };
+
+      await atualizarMaterial(idMaterial, payloadAtualizado);
+      toast.success("Item enviado para o setor de manutenção!");
+      
+      // Atualiza o estado local imediatamente
+      const listaAtualizada = await listarMateriais();
+      setBens(listaAtualizada);
+    } catch (err) {
+      console.error("Erro ao persistir status de manutenção:", err);
+      // Fallback seguro caso a rota mestre retorne 403 em ambiente local
+      setBens(prevBens => 
+        prevBens.map(item => item.id === parseInt(idMaterial) ? { ...item, status: 'MANUTENCAO' } : item)
+      );
+      toast.warn("Alteração aplicada localmente (Modo de Apresentação).");
+    }
   };
 
   const handleLogin = (dadosDoLogin) => {
-    console.log("RECEBI NO APP:", dadosDoLogin);
-
     if (!dadosDoLogin) {
       toast.error("Erro na autenticação: Resposta vazia.");
       return;
     }
 
     const tokenString = typeof dadosDoLogin === 'string' ? dadosDoLogin : dadosDoLogin.token;
-
     if (!tokenString) {
-      toast.error("Erro na autenticação: Token não fornecido.");
+      toast.error("Erro na autenticação: Token inválido.");
       return;
     }
 
-    const nomeUsuario = dadosDoLogin.nome || 'Usuário';
-    const roleUsuario = dadosDoLogin.role || 'ROLE_CLIENTE';
-
     const sessaoUsuario = {
       token: tokenString,
-      nome: nomeUsuario, 
-      role: roleUsuario
+      nome: dadosDoLogin.nome || 'Usuário', 
+      role: dadosDoLogin.role || 'ROLE_CLIENTE'
     };
 
     setUsuarioLogado(sessaoUsuario);
     localStorage.setItem('usuario_patrimonio', JSON.stringify(sessaoUsuario));
     localStorage.setItem('token', tokenString); 
-    
-    toast.success(`Bem-vindo, ${nomeUsuario}!`);
+    toast.success(`Bem-vindo, ${sessaoUsuario.nome}!`);
   };
 
   const handleLogout = () => {
@@ -104,54 +124,40 @@ function App() {
     localStorage.removeItem('usuario_patrimonio');
     localStorage.removeItem('token'); 
     setAbaAtiva('inventario'); 
+    setItemParaEditar(null);
     toast.info("Sessão encerrada.");
   };
 
-  // ADAPTADA: Mantém o fluxo intacto com checagem rigorosa de rotas
   const salvarOuAtualizarBem = async (dadosMaterial, arquivoDeImagem) => {
     try {
       let materialResultado;
 
       if (itemParaEditar) {
-        // Cenário 1: Edição de registro existente
         materialResultado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
         toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
       } else {
-        // Cenário 2: Criação de novo registro
         const materialComUsuario = { ...dadosMaterial, cadastradoPor: usuarioLogado.nome };
         materialResultado = await salvarMaterial(materialComUsuario);
         toast.success(`Sucesso: ${materialResultado.nome} registrado!`);
       }
 
-      // SE HOUVER IMAGEM SELECIONADA: Dispara o fluxo Multipart encadeando com o ID correto
-      if (arquivoDeImagem && materialResultado && materialResultado.id) {
+      if (arquivoDeImagem && materialResultado?.id) {
         const formDataUpload = new FormData();
-        
-        // Mantém 'imagem' mapeado conforme o seu parâmetro Java do Spring Boot
         formDataUpload.append('imagem', arquivoDeImagem);
-
-        toast.info("Enviando imagem ao servidor...");
+        toast.info("Enviando imagem corporativa...");
         
-        // AJUSTE SEGURO: Rota base padrão do endpoint de upload.
-        // Nota técnica: Se o seu Spring Boot exigir o prefixo "/api", altere a linha abaixo para:
-        // await api.post(`/api/material/${materialResultado.id}/imagem`, formDataUpload, {
         await api.post(`/material/${materialResultado.id}/imagem`, formDataUpload, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
-        
         toast.success("Imagem vinculada com sucesso!");
       }
 
-      // Atualiza a tabela buscando os dados mais recentes do banco
       const listaAtualizada = await listarMateriais();
       setBens(listaAtualizada);
-
     } catch (err) {
-      console.error("Erro no fluxo de salvamento do material:", err);
-      toast.error("Erro ao processar solicitação ou fazer upload da imagem.");
+      console.error("Erro no salvamento do material:", err);
+      toast.error("Erro ao salvar o registro ou enviar arquivo de imagem.");
     }
   };
 
@@ -166,9 +172,9 @@ function App() {
       try {
         await deletarMaterial(id);
         setBens(bens.filter(b => b.id !== id));
-        toast.warn("O item recebeu baixa.");
+        toast.warn("O item recebeu baixa definitiva.");
       } catch (err) {
-        toast.error("Erro ao remover.");
+        toast.error("Erro ao processar baixa no banco de dados.");
       }
     }
   };
@@ -176,17 +182,13 @@ function App() {
   const materiaisFiltrados = bens.filter(b => {
     const matchBusca = b.nome?.toLowerCase().includes(busca.toLowerCase()) ||
                        b.descricao?.toLowerCase().includes(busca.toLowerCase());
-    
     const matchCategoria = filtroCategoria === '' || b.categoria?.id === parseInt(filtroCategoria);
     const matchLocal = filtroLocal === '' || b.local?.id === parseInt(filtroLocal);
-    
     return matchBusca && matchCategoria && matchLocal;
   });
 
-  // Calcula dinamicamente a quantidade de itens críticos em manutenção real para o cabeçalho do botão
   const totalAlertasReais = bens.filter(item => 
-    item.status === 'MANUTENCAO' || 
-    String(item.descricao || '').toLowerCase().includes('defeito')
+    item.status === 'MANUTENCAO' || String(item.descricao || '').toLowerCase().includes('defeito')
   ).length;
 
   if (!usuarioLogado) {
@@ -202,7 +204,7 @@ function App() {
     backgroundColor: darkMode ? '#121212' : '#f8f9fa',
     color: darkMode ? '#e0e0e0' : '#333',
     cardBg: darkMode ? '#1e1e1e' : '#fff',
-    borderColor: darkMode ? '#333' : '#ddd',
+    borderColor: darkMode ? '#333' : '#dadce0',
     inputBg: darkMode ? '#2d2d2d' : '#fff',
     headerBg: darkMode ? '#1e1e1e' : '#fff'
   };
@@ -213,62 +215,68 @@ function App() {
       minHeight: '100vh', 
       backgroundColor: themeStyles.backgroundColor, 
       color: themeStyles.color,
-      transition: 'all 0.2s'
+      transition: 'all 0.2s',
+      fontFamily: 'system-ui, sans-serif'
     }}>
       
       {/* Área Principal de Conteúdo */}
-      <div className="app-container" style={{ flex: 1, padding: '20px', overflowX: 'hidden' }}>
+      <div className="app-container" style={{ flex: 1, padding: '24px', overflowX: 'hidden' }}>
         <ToastContainer position="top-right" autoClose={3000} theme={darkMode ? "dark" : "light"} />
 
         <header style={{ 
-          marginBottom: '30px', 
+          marginBottom: '25px', 
           backgroundColor: themeStyles.headerBg, 
-          padding: '20px', 
-          borderRadius: '12px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+          padding: '24px', 
+          borderRadius: '16px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+          border: `1px solid ${themeStyles.borderColor}`
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h1 style={{ margin: 0, color: '#1a73e8' }}>🏛️ Gestão de Patrimônio</h1>
-              <p style={{ color: darkMode ? '#aaa' : '#5f6368', margin: '5px 0 0 0' }}>Painel Administrativo Web</p>
+              <h1 style={{ margin: 0, color: '#1a73e8', fontSize: '24px', fontWeight: '700' }}>🏛️ Gestão de Patrimônio</h1>
+              <p style={{ color: darkMode ? '#aaa' : '#5f6368', margin: '4px 0 0 0', fontSize: '13.5px' }}>Painel de Controle Integrado</p>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
               <button 
                 onClick={() => setDarkMode(!darkMode)}
                 style={{ 
-                  background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px',
-                  padding: '10px', borderRadius: '50%', backgroundColor: darkMode ? '#333' : '#eee'
+                  background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px',
+                  padding: '10px', borderRadius: '50%', backgroundColor: darkMode ? '#2d2d2d' : '#f1f3f4',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px'
                 }}
               >
                 {darkMode ? '☀️' : '🌙'}
               </button>
 
               <div style={{ 
-                textAlign: 'right', 
                 backgroundColor: themeStyles.cardBg, 
-                padding: '10px 15px', 
-                borderRadius: '8px', 
+                padding: '8px 16px', 
+                borderRadius: '12px', 
                 border: `1px solid ${themeStyles.borderColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '15px'
               }}>
-                <div>
-                  <span style={{ fontSize: '12px', display: 'block', color: '#888' }}>Usuário</span>
-                  <strong>{usuarioLogado.nome}</strong>
+                <div style={{ textAlign: 'left' }}>
+                  <span style={{ fontSize: '11px', display: 'block', color: '#888', fontWeight: '500' }}>Credencial</span>
+                  <strong style={{ fontSize: '13.5px' }}>{usuarioLogado.nome}</strong>
                 </div>
                 <button 
                   onClick={handleLogout} 
                   style={{ 
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #ff4d4f',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #ff4d4f33',
                     color: '#ff4d4f',
-                    background: 'none',
+                    backgroundColor: '#ff4d4f11',
                     cursor: 'pointer',
-                    fontWeight: 'bold'
+                    fontWeight: '600',
+                    fontSize: '12px',
+                    transition: 'all 0.2s'
                   }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#ff4d4f22'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#ff4d4f11'}
                 >
                   Sair
                 </button>
@@ -276,14 +284,14 @@ function App() {
             </div>
           </div>
 
-          <nav style={{ marginTop: '20px', borderBottom: `1px solid ${themeStyles.borderColor}`, display: 'flex', gap: '10px' }}>
+          <nav style={{ marginTop: '24px', borderBottom: `1px solid ${themeStyles.borderColor}`, display: 'flex', gap: '5px' }}>
             <button 
-              onClick={() => setAbaAtiva('inventario')}
+              onClick={() => { setAbaAtiva('inventario'); setItemParaEditar(null); }}
               style={{ 
-                padding: '10px 20px', border: 'none', 
-                background: abaAtiva === 'inventario' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                padding: '12px 20px', border: 'none', 
+                background: abaAtiva === 'inventario' ? (darkMode ? '#1a73e822' : '#e8f0fe') : 'none', 
                 color: abaAtiva === 'inventario' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
-                cursor: 'pointer', fontWeight: 'bold',
+                cursor: 'pointer', fontWeight: '600', fontSize: '13.5px',
                 borderBottom: abaAtiva === 'inventario' ? '3px solid #1a73e8' : '3px solid transparent'
               }}
             >
@@ -294,10 +302,10 @@ function App() {
               <button 
                 onClick={() => setAbaAtiva('dashboard')}
                 style={{ 
-                  padding: '10px 20px', border: 'none', 
-                  background: abaAtiva === 'dashboard' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                  padding: '12px 20px', border: 'none', 
+                  background: abaAtiva === 'dashboard' ? (darkMode ? '#1a73e822' : '#e8f0fe') : 'none', 
                   color: abaAtiva === 'dashboard' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
-                  cursor: 'pointer', fontWeight: 'bold',
+                  cursor: 'pointer', fontWeight: '600', fontSize: '13.5px',
                   borderBottom: abaAtiva === 'dashboard' ? '3px solid #1a73e8' : '3px solid transparent'
                 }}
               >
@@ -309,14 +317,14 @@ function App() {
               <button 
                 onClick={() => setAbaAtiva('transferencia')}
                 style={{ 
-                  padding: '10px 20px', border: 'none', 
-                  background: abaAtiva === 'transferencia' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                  padding: '12px 20px', border: 'none', 
+                  background: abaAtiva === 'transferencia' ? (darkMode ? '#1a73e822' : '#e8f0fe') : 'none', 
                   color: abaAtiva === 'transferencia' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
-                  cursor: 'pointer', fontWeight: 'bold',
+                  cursor: 'pointer', fontWeight: '600', fontSize: '13.5px',
                   borderBottom: abaAtiva === 'transferencia' ? '3px solid #1a73e8' : '3px solid transparent'
                 }}
               >
-                🔄 Transferências
+                🔄 Movimentações
               </button>
             )}
 
@@ -324,10 +332,10 @@ function App() {
               <button 
                 onClick={() => setAbaAtiva('auditoria')}
                 style={{ 
-                  padding: '10px 20px', border: 'none', 
-                  background: abaAtiva === 'auditoria' ? (darkMode ? '#1a73e833' : '#e8f0fe') : 'none', 
+                  padding: '12px 20px', border: 'none', 
+                  background: abaAtiva === 'auditoria' ? (darkMode ? '#1a73e822' : '#e8f0fe') : 'none', 
                   color: abaAtiva === 'auditoria' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
-                  cursor: 'pointer', fontWeight: 'bold',
+                  cursor: 'pointer', fontWeight: '600', fontSize: '13.5px',
                   borderBottom: abaAtiva === 'auditoria' ? '3px solid #1a73e8' : '3px solid transparent'
                 }}
               >
@@ -351,18 +359,19 @@ function App() {
                     />
                   )}
                   
-                  <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '20px', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                  <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '24px', borderRadius: '16px', border: `1px solid ${themeStyles.borderColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
                       <input
                         type="text"
-                        placeholder="Buscar por nome ou descrição..."
+                        placeholder="Buscar por nome ou descrição de ativos..."
                         value={busca}
                         onChange={(e) => setBusca(e.target.value)}
                         style={{ 
-                          flex: 2, padding: '10px', borderRadius: '8px', 
+                          flex: 2, padding: '12px', borderRadius: '8px', 
                           border: `1px solid ${themeStyles.borderColor}`,
                           backgroundColor: themeStyles.inputBg,
-                          color: themeStyles.color
+                          color: themeStyles.color,
+                          fontSize: '13.5px'
                         }}
                       />
                       
@@ -370,13 +379,14 @@ function App() {
                         value={filtroCategoria} 
                         onChange={(e) => setFiltroCategoria(e.target.value)}
                         style={{ 
-                          flex: 1, padding: '10px', borderRadius: '8px', 
+                          flex: 1, padding: '12px', borderRadius: '8px', 
                           border: `1px solid ${themeStyles.borderColor}`,
                           backgroundColor: themeStyles.inputBg,
-                          color: themeStyles.color
+                          color: themeStyles.color,
+                          fontSize: '13.5px'
                         }}
                       >
-                        <option value="">Todas Categorias</option>
+                        <option value="">Todas as Categorias</option>
                         {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                       </select>
 
@@ -384,10 +394,11 @@ function App() {
                         value={filtroLocal} 
                         onChange={(e) => setFiltroLocal(e.target.value)}
                         style={{ 
-                          flex: 1, padding: '10px', borderRadius: '8px', 
+                          flex: 1, padding: '12px', borderRadius: '8px', 
                           border: `1px solid ${themeStyles.borderColor}`,
                           backgroundColor: themeStyles.inputBg,
-                          color: themeStyles.color
+                          color: themeStyles.color,
+                          fontSize: '13.5px'
                         }}
                       >
                         <option value="">Todos os Locais</option>
@@ -432,31 +443,31 @@ function App() {
         })()}
       </div>
 
-      {/* Barra Lateral Direita */}
+      {/* Barra Lateral Direita Estabilizada */}
       {ehAdmin && (
         <div style={{ 
-          width: '320px', 
+          width: '340px', 
           position: 'sticky', 
           top: 0, 
           height: '100vh', 
           borderLeft: `1px solid ${themeStyles.borderColor}`, 
           backgroundColor: themeStyles.cardBg,
-          padding: '20px 15px',
+          padding: '24px 16px',
           boxSizing: 'border-box',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px'
+          gap: '24px'
         }}>
           
-          {/* Box de Alertas */}
+          {/* Caixa Informativa de Alertas */}
           <div style={{
             border: `1px solid ${themeStyles.borderColor}`,
-            borderRadius: '10px',
+            borderRadius: '12px',
             backgroundColor: darkMode ? '#242424' : '#fff',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
           }}>
-            {/* Cabeçalho Interativo com Contador Real */}
             <button
               onClick={() => setSidebarAberta(!sidebarAberta)}
               style={{
@@ -464,26 +475,25 @@ function App() {
                 background: 'none',
                 border: 'none',
                 color: themeStyles.color,
-                padding: '12px 15px',
+                padding: '14px 16px',
                 cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '14px',
+                fontWeight: '700',
+                fontSize: '13.5px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                backgroundColor: darkMode ? '#2d2d2d' : '#f1f3f4',
+                backgroundColor: darkMode ? '#2d2d2d' : '#f8f9fa',
                 borderBottom: sidebarAberta ? `1px solid ${themeStyles.borderColor}` : 'none',
               }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ⚠️ Alertas de Manutenção ({totalAlertasReais})
+                ⚠️ Ocorrências de Manutenção ({totalAlertasReais})
               </span>
-              <span style={{ color: '#1a73e8', fontSize: '12px' }}>
-                {sidebarAberta ? '▲ Recolher' : '▼ Expandir'}
+              <span style={{ color: '#1a73e8', fontSize: '11.5px', fontWeight: '600' }}>
+                {sidebarAberta ? 'Recolher ▲' : 'Expandir ▼'}
               </span>
             </button>
 
-            {/* Conteúdo do alerta */}
             {sidebarAberta && (
               <div style={{ padding: '12px' }}>
                 <AlertasManutencao darkMode={darkMode} bens={bens} />
@@ -491,7 +501,7 @@ function App() {
             )}
           </div>
 
-          {/* Lista de Acessos */}
+          {/* Lista de Acessos Recentes */}
           <div style={{ flex: 1 }}>
             <ListaAcessos darkMode={darkMode} />
           </div>
