@@ -128,6 +128,7 @@ function App() {
     toast.info("Sessão encerrada.");
   };
 
+  // CORREÇÃO APLICADA: Payload limpo enviado ao salvarMaterial para evitar conflito com o Java
   const salvarOuAtualizarBem = async (dadosMaterial, arquivoDeImagem) => {
     try {
       let materialResultado;
@@ -137,8 +138,9 @@ function App() {
         toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
       } else {
-        const materialComUsuario = { ...dadosMaterial, cadastradoPor: usuarioLogado.nome };
-        materialResultado = await salvarMaterial(materialComUsuario);
+        // CORREÇÃO: Enviando dadosMaterial diretamente sem injetar o 'cadastradoPor'
+        // para alinhar estritamente com as propriedades mapeadas no Java (MaterialRequest DTO)
+        materialResultado = await salvarMaterial(dadosMaterial);
         toast.success(`Sucesso: ${materialResultado.nome} registrado!`);
       }
 
@@ -148,8 +150,8 @@ function App() {
         toast.info("Enviando imagem corporativa...");
         
         await api.post(`/material/${materialResultado.id}/imagem`, formDataUpload, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
         toast.success("Imagem vinculada com sucesso!");
       }
 

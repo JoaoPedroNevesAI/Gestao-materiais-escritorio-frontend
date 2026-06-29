@@ -16,7 +16,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     localId: '', 
     valor: '',
     dataAquisicao: '',
-    dataLimiteManutencao: ''
+    dataLimiteManutencao: '' 
   });
 
   const atualizarListas = () => {
@@ -35,43 +35,47 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
 
   useEffect(() => {
     if (bemParaEditar) {
-      // CORREÇÃO DEFINITIVA (João P Neves): Converte qualquer formato de data do banco para yyyy-MM-dd
       const formatarDataSegura = (dataRaw) => {
         if (!dataRaw) return '';
         
-        // Se já vier no formato correto ISO (yyyy-MM-ddThh:mm:ss...)
-        if (dataRaw.includes('T')) {
+        if (typeof dataRaw === 'string' && dataRaw.includes('T')) {
           return dataRaw.split('T')[0];
         }
         
-        // Se vier no formato brasileiro (dd/MM/yyyy)
-        if (dataRaw.includes('/')) {
+        if (typeof dataRaw === 'string' && dataRaw.includes('/')) {
           const partes = dataRaw.split('/');
           if (partes.length === 3) {
-            // Se o ano vier primeiro ou por último
             if (partes[2].length === 4) {
-              return `${partes[2]}-${partes[1]}-${partes[0]}`; // dd/MM/yyyy -> yyyy-MM-dd
+              return `${partes[2]}-${partes[1]}-${partes[0]}`; 
             }
           }
         }
         
-        // Retorno padrão higienizado cortando espaços extras
-        return dataRaw.substring(0, 10);
+        return String(dataRaw).substring(0, 10);
       };
+
+      // Mapeia variações de propriedades vindas do banco
+      const dataAquisicaoBanco = bemParaEditar.dataAquisicao || bemParaEditar.data_aquisicao || '';
+      const dataManutencaoBanco = 
+        bemParaEditar.dataLimiteManutencao || 
+        bemParaEditar.prazoManutencao || 
+        bemParaEditar.prazoLimiteManutencao || 
+        bemParaEditar.data_limite_manutencao ||
+        '';
 
       setFormData({
         nome: bemParaEditar.nome || '',
         descricao: bemParaEditar.descricao || '',
         quantidade: bemParaEditar.quantidade || '',
-        categoriaId: bemParaEditar.categoria?.id || '',
-        localId: bemParaEditar.local?.id || '', 
+        categoriaId: bemParaEditar.categoria?.id || bemParaEditar.categoriaId || '',
+        localId: bemParaEditar.local?.id || bemParaEditar.localId || '', 
         valor: bemParaEditar.valor || '',
-        dataAquisicao: formatarDataSegura(bemParaEditar.dataAquisicao),
-        dataLimiteManutencao: formatarDataSegura(bemParaEditar.dataLimiteManutencao)
+        dataAquisicao: formatarDataSegura(dataAquisicaoBanco),
+        dataLimiteManutencao: formatarDataSegura(dataManutencaoBanco)
       });
       
       const nomeImagem = bemParaEditar.imagem || bemParaEditar.foto;
-      setImagePreview(nomeImagem ? `http://localhost:8080/imagens_cadastradas/${nomeImagem}` : '');
+      setImagePreview(nomeImagem ? `http://localhost:8080/uploads/${nomeImagem}` : '');
       setImagemArquivo(null);
     } else {
       limparCampos();
@@ -101,36 +105,37 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
   };
 
   const handleCriarCategoriaRapida = async () => {
-    const nomeCat = prompt("Digite o nome da nova Categoria (Ex: Eletrônicos, Móveis):");
+    const nomeCat = prompt("Digite o nome da nova Categoria:");
     if (!nomeCat || nomeCat.trim() === "") return;
-
     try {
       await api.post('/categoria', { nome: nomeCat });
       alert("Categoria criada com sucesso!");
       atualizarListas();
     } catch (err) {
       console.error(err);
-      alert("Erro ao criar categoria. Verifique a API backend.");
+      alert("Erro ao criar categoria.");
     }
   };
 
   const handleCriarLocalRapido = async () => {
-    const nomeLoc = prompt("Digite o nome do novo Local (Ex: Sala 103, Laboratório 2):");
+    const nomeLoc = prompt("Digite o nome do novo Local:");
     if (!nomeLoc || nomeLoc.trim() === "") return;
-
     try {
       await api.post('/local', { nome: nomeLoc });
       alert("Local criado com sucesso!");
       atualizarListas();
     } catch (err) {
       console.error(err);
-      alert("Erro ao criar local no Spring.");
+      alert("Erro ao criar local.");
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    // Recupera o nome do arquivo atual para não perder a referência caso o usuário não envie uma nova foto
+    const nomeImagemAtual = bemParaEditar?.imagem || bemParaEditar?.foto || null;
+
     const materialFormatado = {
       id: bemParaEditar?.id || null, 
       nome: formData.nome,
@@ -139,6 +144,12 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       valor: formData.valor ? parseFloat(formData.valor) : 0.0, 
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
+      prazoManutencao: formData.dataLimiteManutencao,
+      
+      // SOLUÇÃO DO BUG DA IMAGEM: Mantém a string da imagem antiga se nenhuma nova for selecionada
+      imagem: imagemArquivo ? null : nomeImagemAtual,
+      foto: imagemArquivo ? null : nomeImagemAtual,
+
       categoriaId: formData.categoriaId ? parseInt(formData.categoriaId) : null,
       localId: formData.localId ? parseInt(formData.localId) : null,
       categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
@@ -212,7 +223,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
             name="nome" 
             value={formData.nome}
             onChange={handleChange}
-            placeholder="Nome do Patrimônio (Ex: Servidor IBM Racks)"
+            placeholder="Nome do Patrimônio"
             required 
             style={styles.input} 
           />
@@ -240,7 +251,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
           style={styles.input}
         />
 
-        {/* Categoria com botão + */}
+        {/* Categoria */}
         <div style={styles.flexContainer}>
           <select 
             name="categoriaId" 
@@ -254,10 +265,10 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
               <option key={cat.id} value={cat.id}>{cat.nome}</option>
             ))}
           </select>
-          <button type="button" onClick={handleCriarCategoriaRapida} title="Adicionar nova categoria" style={styles.btnMais}>+</button>
+          <button type="button" onClick={handleCriarCategoriaRapida} style={styles.btnMais}>+</button>
         </div>
 
-        {/* Local com botão + */}
+        {/* Local */}
         <div style={styles.flexContainer}>
           <select 
             name="localId" 
@@ -271,7 +282,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
               <option key={loc.id} value={loc.id}>{loc.nome}</option>
             ))}
           </select>
-          <button type="button" onClick={handleCriarLocalRapido} title="Adicionar novo local" style={styles.btnMais}>+</button>
+          <button type="button" onClick={handleCriarLocalRapido} style={styles.btnMais}>+</button>
         </div>
 
         {/* Data de Aquisição */}
@@ -306,15 +317,14 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
             name="descricao" 
             value={formData.descricao}
             onChange={handleChange}
-            placeholder="Especificações técnicas, número de série ou detalhes de conservação do bem..."
+            placeholder="Especificações técnicas ou detalhes do bem..."
             style={{ ...styles.input, height: '80px', resize: 'vertical' }} 
           />
         </div>
 
-        {/* SEÇÃO DE UPLOAD CUSTOMIZADA */}
+        {/* SEÇÃO DE UPLOAD */}
         <div style={{ gridColumn: 'span 2', display: 'grid', gap: '8px' }}>
           <label style={styles.label}>Imagem Real do Ativo Físico (PNG, JPG) 📁</label>
-          
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <input 
               type="file" 
@@ -323,7 +333,6 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
               onChange={handleFileChange} 
               style={{ display: 'none' }} 
             />
-            
             <label 
               htmlFor="upload-imagem" 
               style={{
@@ -337,80 +346,39 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
                 fontWeight: '600',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s'
+                gap: '8px'
               }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = darkMode ? '#3d3d3d' : '#e4e6e9'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = darkMode ? '#2d2d2d' : '#f0f2f5'}
             >
-              📷 {imagemArquivo ? 'Substituir Mídia' : 'Vincular Imagem'}
+              📷 {imagePreview ? 'Substituir Mídia' : 'Vincular Imagem'}
             </label>
-
             <span style={{ fontSize: '13px', color: darkMode ? '#aaa' : '#666', fontStyle: 'italic' }}>
-              {imagemArquivo ? imagemArquivo.name : 'Nenhuma imagem selecionada'}
+              {imagemArquivo ? imagemArquivo.name : (imagePreview ? 'Mantendo imagem atual' : 'Nenhuma imagem selecionada')}
             </span>
           </div>
         </div>
 
-        {/* PREVIEW OTIMIZADO */}
+        {/* PREVIEW */}
         {imagePreview && (
-          <div style={{ gridColumn: 'span 2', display: 'flex', center: 'center', justifyContent: 'center', marginTop: '10px' }}>
+          <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
             <div style={{ position: 'relative', border: `2px solid #1a73e8`, borderRadius: '12px', padding: '4px', backgroundColor: darkMode ? '#1e1e1e' : '#fff' }}>
               <img 
                 src={imagePreview} 
-                alt="Preview do Patrimônio" 
-                onError={(e) => e.target.style.display = 'none'}
-                style={{ 
-                  width: '130px', 
-                  height: '130px', 
-                  objectFit: 'cover', 
-                  borderRadius: '8px' 
-                }} 
+                alt="Preview" 
+                style={{ width: '130px', height: '130px', objectFit: 'cover', borderRadius: '8px' }} 
               />
-              <div style={{ position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#1a73e8', color: '#fff', fontSize: '9px', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+              <div style={{ position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#1a73e8', color: '#fff', fontSize: '9px', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
                 PREVIEW DE MÍDIA
               </div>
             </div>
           </div>
         )}
 
-        {/* Botão de Envio Principal */}
-        <button 
-          type="submit" 
-          style={{ 
-            gridColumn: 'span 2', 
-            padding: '12px', 
-            fontWeight: 'bold', 
-            fontSize: '14px',
-            backgroundColor: '#1a73e8',
-            border: 'none',
-            borderRadius: '8px',
-            color: '#fff',
-            cursor: 'pointer',
-            marginTop: '10px',
-            boxShadow: '0 4px 12px rgba(26,115,232,0.25)'
-          }}
-        >
+        <button type="submit" style={{ gridColumn: 'span 2', padding: '12px', fontWeight: 'bold', backgroundColor: '#1a73e8', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', marginTop: '10px' }}>
           {bemParaEditar ? 'Confirmar Atualização de Patrimônio' : 'Cadastrar Ativo no Sistema'}
         </button>
 
-        {/* Botão Cancelar Edição */}
         {bemParaEditar && (
-          <button 
-            type="button" 
-            onClick={cancelarEdicao}
-            style={{ 
-              gridColumn: 'span 2', 
-              padding: '10px', 
-              backgroundColor: 'transparent',
-              border: '1px solid #ff4d4f',
-              borderRadius: '8px',
-              color: '#ff4d4f',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontSize: '13px'
-            }}
-          >
+          <button type="button" onClick={cancelarEdicao} style={{ gridColumn: 'span 2', padding: '10px', backgroundColor: 'transparent', border: '1px solid #ff4d4f', borderRadius: '8px', color: '#ff4d4f', fontWeight: '600', cursor: 'pointer' }}>
             Descartar Edição
           </button>
         )}

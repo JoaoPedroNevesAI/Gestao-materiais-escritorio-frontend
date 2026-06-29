@@ -325,7 +325,7 @@ export default function CadastroUsuario({ aoFinalizar }) {
             >
               <option value="">Selecione o cargo...</option>
               <option value="ADM">Administrador (Total)</option>
-              <option value="CLIENTE">Colaborador (Apenas consulta)</option>
+              <option value="COLABORADOR">Colaborador (Apenas consulta)</option>
             </select>
           </div>
 

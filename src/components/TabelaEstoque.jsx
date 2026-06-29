@@ -12,12 +12,23 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
     return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Função auxiliar para garantir que a data seja repassada de forma limpa (padrão ISO YYYY-MM-DD) ao editar
+  // FUNÇÃO CORRIGIDA: Agora limpa e formata tanto a data de aquisição quanto o prazo de manutenção para o input HTML
   const tratarItemParaEdicao = (item) => {
     let itemFormatado = { ...item };
-    if (itemFormatado.dataAquisicao) {
+    
+    // Tratando Data de Aquisição
+    if (itemFormatado.dataAquisicao && typeof itemFormatado.dataAquisicao === 'string') {
       itemFormatado.dataAquisicao = itemFormatado.dataAquisicao.split('T')[0];
     }
+    
+    // Tratando Prazo Limite de Manutenção
+    if (itemFormatado.prazoManutencao && typeof itemFormatado.prazoManutencao === 'string') {
+      itemFormatado.prazoManutencao = itemFormatado.prazoManutencao.split('T')[0];
+    } else if (itemFormatado.prazoLimiteManutencao && typeof itemFormatado.prazoLimiteManutencao === 'string') {
+      // Fallback caso o back-end devolva com o nome da propriedade completo
+      itemFormatado.prazoManutencao = itemFormatado.prazoLimiteManutencao.split('T')[0];
+    }
+    
     aoEditar(itemFormatado);
   };
 
@@ -57,8 +68,9 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
           ) : (
             materiais.map(item => {
               const nomeDaImagem = item.imagem || item.foto;
+              
               const urlCompletaImagem = nomeDaImagem 
-                ? `http://localhost:8080/imagens_cadastradas/${nomeDaImagem}` 
+                ? `http://localhost:8080/uploads/${nomeDaImagem}` 
                 : null;
 
               return (
@@ -149,7 +161,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                             fontSize: '12px',
                             fontWeight: '600',
                             backgroundColor: darkMode ? '#3c1e1e' : '#fce8e6',
-                            border: darkMode ? '1px solid #632525' : '1px solid #fad2cf',
+                            border: darkMode ? '1px solid #662525' : '1px solid #fad2cf',
                             color: darkMode ? '#ff9999' : '#c5221f',
                             borderRadius: '6px',
                             cursor: 'pointer',
@@ -181,7 +193,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
 
                       </div>
 
-                      {/* POPUP DO QR CODE (João P Neves: Ajustado com botão X funcional e suporte a Dark Mode) */}
+                      {/* POPUP DO QR CODE */}
                       {qrVisivel === item.id && (
                         <div style={{ 
                           position: 'absolute', 
@@ -198,7 +210,6 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                           alignItems: 'center',
                           minWidth: '130px'
                         }}>
-                          {/* BOTÃO X PARA FECHAR */}
                           <button 
                             onClick={() => setQrVisivel(null)}
                             title="Fechar QR Code"
@@ -224,7 +235,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
 
                           <div style={{ 
                             marginTop: '6px',
-                            background: '#fff', // Mantém fundo branco do QR SVG para legibilidade de escaneamento
+                            background: '#fff', 
                             padding: '6px',
                             borderRadius: '6px'
                           }}>
