@@ -67,16 +67,22 @@ function App() {
     }
   }, [abaAtiva]);
 
-  // Solução Definitiva: Envia o status de manutenção real ao Spring Boot e recarrega a tabela
+  // CORREÇÃO: Limpa os sub-objetos para evitar o Erro 400 (Bad Request) na API
   const forcarManutencaoNoFront = async (idMaterial, motivoDefeito) => {
     try {
       const itemOriginal = bens.find(b => b.id === parseInt(idMaterial));
       if (!itemOriginal) return;
 
+      // Remove propriedades complexas que o MaterialRequest DTO do Spring Boot rejeita
+      const { categoria, local, localId, categoriaId, ...resto } = itemOriginal;
+
       const payloadAtualizado = {
-        ...itemOriginal,
+        ...resto,
         status: 'MANUTENCAO',
-        descricao: motivoDefeito ? `${itemOriginal.descricao || ''} (Defeito: ${motivoDefeito})` : itemOriginal.descricao
+        descricao: motivoDefeito ? `${itemOriginal.descricao || ''} (Defeito: ${motivoDefeito})` : itemOriginal.descricao,
+        // Alinha com os IDs planos que o Java espera receber
+        categoriaId: categoriaId || categoria?.id || null,
+        localId: localId || local?.id || null
       };
 
       await atualizarMaterial(idMaterial, payloadAtualizado);
@@ -87,7 +93,7 @@ function App() {
       setBens(listaAtualizada);
     } catch (err) {
       console.error("Erro ao persistir status de manutenção:", err);
-      // Fallback seguro caso a rota mestre retorne 403 em ambiente local
+      // Fallback seguro caso a rota retorne erro em ambiente local
       setBens(prevBens => 
         prevBens.map(item => item.id === parseInt(idMaterial) ? { ...item, status: 'MANUTENCAO' } : item)
       );
@@ -128,7 +134,7 @@ function App() {
     toast.info("Sessão encerrada.");
   };
 
-  // CORREÇÃO APLICADA: Payload limpo enviado ao salvarMaterial para evitar conflito com o Java
+  // Payload limpo enviado ao salvarMaterial para evitar conflito com o Java
   const salvarOuAtualizarBem = async (dadosMaterial, arquivoDeImagem) => {
     try {
       let materialResultado;
@@ -138,8 +144,6 @@ function App() {
         toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
       } else {
-        // CORREÇÃO: Enviando dadosMaterial diretamente sem injetar o 'cadastradoPor'
-        // para alinhar estritamente com as propriedades mapeadas no Java (MaterialRequest DTO)
         materialResultado = await salvarMaterial(dadosMaterial);
         toast.success(`Sucesso: ${materialResultado.nome} registrado!`);
       }
@@ -150,8 +154,8 @@ function App() {
         toast.info("Enviando imagem corporativa...");
         
         await api.post(`/material/${materialResultado.id}/imagem`, formDataUpload, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-});
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
         toast.success("Imagem vinculada com sucesso!");
       }
 

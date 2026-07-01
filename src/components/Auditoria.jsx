@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { buscarLogsAuditoria } from '../services/api'; // Chamada real do backend
+import { buscarLogsAuditoria } from '../services/api'; // Chamada ajustada no nosso service front-end
 
 export default function Auditoria({ darkMode }) {
   const [logs, setLogs] = useState([]);
@@ -8,7 +8,11 @@ export default function Auditoria({ darkMode }) {
   useEffect(() => {
     buscarLogsAuditoria()
       .then(dados => {
-        setLogs(dados);
+        // Garante que as ações mais recentes (timestamps maiores) fiquem sempre no topo da tabela
+        const dadosOrdenados = [...dados].sort((a, b) => {
+          return new Date(b.data || b.timestamp) - new Date(a.data || a.timestamp);
+        });
+        setLogs(dadosOrdenados);
         setCarregando(false);
       })
       .catch(err => {
@@ -17,7 +21,7 @@ export default function Auditoria({ darkMode }) {
       });
   }, []);
 
-  // Helper para formatar a data vinda do banco de dados
+  // Helper para formatar a data vinda do banco de dados ou do localStorage
   const formatarData = (dataString) => {
     if (!dataString) return '—';
     try {

@@ -21,6 +21,38 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
+// --- HELPER LOCAL PARA COLETAR SESSÃO DO USUÁRIO ---
+const obterUsuarioAtual = () => {
+  try {
+    const usuarioSalvo = localStorage.getItem('usuario_patrimonio');
+    if (usuarioSalvo) {
+      const parsed = JSON.parse(usuarioSalvo);
+      return parsed.nome || 'Usuário';
+    }
+  } catch (e) {
+    console.error("Erro ao ler sessão do localStorage para auditoria", e);
+  }
+  return 'Luis'; 
+};
+
+// --- HELPER LOCAL PARA INJETAR LOGS EM TEMPO REAL NO FRONT ---
+const salvarLogLocal = (acao, item, detalhe = '') => {
+  try {
+    const logsAntigos = JSON.parse(localStorage.getItem('logs_auditoria_front')) || [];
+    const novoLog = {
+      id: Date.now(), 
+      usuario: obterUsuarioAtual(),
+      acao: acao,
+      item: item,
+      detalhe: detalhe,
+      data: new Date().toISOString()
+    };
+    localStorage.setItem('logs_auditoria_front', JSON.stringify([novoLog, ...logsAntigos]));
+  } catch (e) {
+    console.error("Erro ao salvar log na persistência local", e);
+  }
+};
+
 // --- AUTENTICAÇÃO ---
 export const realizarLogin = async (email, senha) => {
   try {
@@ -47,6 +79,9 @@ export const listarMateriais = async () => {
 export const salvarMaterial = async (dados) => {
   try {
     const response = await api.post('/material', dados);
+    if (response.data) {
+      salvarLogLocal('CREATE', response.data.nome || dados.nome, 'Cadastrou novo material corporativo');
+    }
     return response.data;
   } catch (error) {
     console.error("Erro ao salvar material:", error.response || error);
@@ -57,6 +92,7 @@ export const salvarMaterial = async (dados) => {
 export const atualizarMaterial = async (id, dados) => {
   try {
     const response = await api.put(`/material/${id}`, dados);
+    salvarLogLocal('UPDATE', dados.nome || `Item #${id}`, 'Modificou dados cadastrais ou status');
     return response.data;
   } catch (error) {
     console.error("Erro ao atualizar material:", error.response || error);
@@ -67,6 +103,7 @@ export const atualizarMaterial = async (id, dados) => {
 export const deletarMaterial = async (id) => {
   try {
     await api.delete(`/material/${id}`);
+    salvarLogLocal('DELETE', `Patrimônio #${id}`, 'Realizou a exclusão lógica do ativo');
   } catch (error) {
     console.error("Erro ao deletar material:", error.response || error);
     throw error;
@@ -147,14 +184,19 @@ export const listarUsuarios = async () => {
 export const buscarLogsAuditoria = async () => {
   try {
     const response = await api.get('/auditoria');
-    return response.data;
+    const logsLocais = JSON.parse(localStorage.getItem('logs_auditoria_front')) || [];
+    return [...logsLocais, ...response.data];
   } catch (error) {
-    console.error("Erro ao buscar logs (Mock ativo):", error.message);
-    return [
-      { id: 1, usuario: 'Administrador', acao: 'CREATE', item: 'Monitor Dell', data: new Date().toISOString() },
-      { id: 2, usuario: 'João Backend', acao: 'UPDATE', item: 'Cadeira Gamer', detalhe: 'Alterou localização', data: new Date().toISOString() },
-      { id: 3, usuario: 'Administrador', acao: 'DELETE', item: 'Teclado Antigo', data: new Date().toISOString() }
+    console.error("Erro ao buscar logs (Mesclando histórico local):", error.message);
+    
+    const logsLocais = JSON.parse(localStorage.getItem('logs_auditoria_front')) || [];
+    
+    const mocksEstaticos = [
+      { id: 1, usuario: 'Administrador', acao: 'CREATE', item: 'Monitor Dell 24"', detalhe: 'Configuração inicial do sistema', data: '2026-06-28T14:32:00.000Z' },
+      { id: 2, usuario: 'Lucas Cliente', acao: 'UPDATE', item: 'Cadeira Gamer', detalhe: 'Alterou localização para Departamento TI', data: '2026-06-27T10:15:00.000Z' }
     ];
+
+    return [...logsLocais, ...mocksEstaticos];
   }
 };
 

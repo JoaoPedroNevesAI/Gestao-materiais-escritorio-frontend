@@ -67,7 +67,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       if (aprovado) {
         const sol = solicitacoes.find(s => s.id === id);
         if (sol && aoSolicitarManutencao) {
-          aoSolicitarManutencao(sol.materialId, sol.observacao);
+          aoSolicitarManutencao(sol.materialId || sol.material?.id, sol.observacao);
         }
       }
 
@@ -85,7 +85,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       });
 
       if (aprovado && sol && aoSolicitarManutencao) {
-        aoSolicitarManutencao(sol.materialId, sol.observacao);
+        aoSolicitarManutencao(sol.materialId || sol.material?.id, sol.observacao);
       }
 
       setSolicitacoes(prev => prev.filter(s => s.id !== id));
@@ -113,11 +113,15 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     const objetoLocal = locais.find(l => l.id === Number(localDestino));
     const nomeLocalDestino = objetoLocal ? objetoLocal.nome : "Novo Setor";
 
+    // ESTRUTURA BLINDADA: Envia tanto o ID solto quanto a estrutura de objeto interno 
+    // para evitar que o Spring dê erro 500 por incompatibilidade de DTO.
     const dadosEnvio = {
       materialId: Number(materialSelecionado),
+      material: { id: Number(materialSelecionado) },
       tipo: tipoOperacao,
+      observacao: observacao || "Sem observações detalhadas",
       localDestinoId: tipoOperacao === 'TRANSFERENCIA' ? Number(localDestino) : null,
-      observacao: observacao
+      localDestino: tipoOperacao === 'TRANSFERENCIA' ? { id: Number(localDestino) } : null
     };
 
     try {
@@ -145,7 +149,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         materialId: dadosEnvio.materialId,
         materialNome: nomeMaterial,
         tipo: dadosEnvio.tipo,
-        observacao: dadosEnvio.observacao || "Sem observações",
+        observacao: dadosEnvio.observacao,
         localDestinoNome: tipoOperacao === 'TRANSFERENCIA' ? nomeLocalDestino : null
       };
 
@@ -201,6 +205,8 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     btnReprovar: { backgroundColor: '#d93025', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }
   };
 
+  const listaSeguraSolicitacoes = Array.isArray(solicitacoes) ? solicitacoes : [];
+
   return (
     <div style={styles.container}>
       <div style={styles.navAbas}>
@@ -208,7 +214,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
           style={styles.abaBtn(abaAtiva === 'PENDENCIAS')} 
           onClick={() => { setAbaAtiva('PENDENCIAS'); setMensagem({tipo:'', texto:''}); }}
         >
-          📋 Solicitações Pendentes ({solicitacoes.length})
+          📋 Solicitações Pendentes ({listaSeguraSolicitacoes.length})
         </button>
         <button 
           style={styles.abaBtn(abaAtiva === 'FORMULARIO')} 
@@ -227,10 +233,10 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       {abaAtiva === 'PENDENCIAS' && (
         <div>
           <p style={{ fontSize: '14px', color: darkMode ? '#aaa' : '#666', marginBottom: '15px' }}>
-            Abaixo estão os pedidos realizados por colaboradores via aplicativo Mobile ou Web aguardando a sua autorização.
+            Abaixo estão os pedidos realizados por colaboradores aguardando a sua autorização.
           </p>
 
-          {solicitacoes.length === 0 ? (
+          {listaSeguraSolicitacoes.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
               🎉 Nenhuma solicitação pendente no momento!
             </div>
@@ -247,30 +253,37 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                   </tr>
                 </thead>
                 <tbody>
-                  {solicitacoes.map(sol => (
-                    <tr key={sol.id}>
-                      <td style={styles.td}>
-                        <strong>{sol.solicitante}</strong>
-                        <br/><span style={{fontSize:'11px', color:'#888'}}>{sol.dataSolicitacao}</span>
-                      </td>
-                      <td style={styles.td}>{sol.materialNome}</td>
-                      <td style={styles.td}>
-                        <span style={styles.badge(sol.tipo)}>{sol.tipo}</span>
-                      </td>
-                      <td style={styles.td}>
-                        <i style={{fontSize:'13px', color: darkMode ? '#ccc' : '#555'}}>"{sol.observacao}"</i>
-                        {sol.tipo === 'TRANSFERENCIA' && (
-                          <div style={{fontSize:'12px', marginTop:'4px', color:'#1a73e8'}}>
-                            Destino: 📍 {sol.localDestinoNome}
-                          </div>
-                        )}
-                      </td>
-                      <td style={styles.td}>
-                        <button disabled={loading} onClick={() => handleDecidirSolicitacao(sol.id, true)} style={styles.btnAprovar}>Aprovar</button>
-                        <button disabled={loading} onClick={() => handleDecidirSolicitacao(sol.id, false)} style={styles.btnReprovar}>Recusar</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {listaSeguraSolicitacoes.map(sol => {
+                    if (!sol) return null;
+                    const idSol = sol.id;
+                    const nomeDoMaterial = sol.materialNome || sol.material?.nome || 'Item Desconhecido';
+                    const solicitanteNome = sol.solicitante || sol.usuario?.nome || 'Colaborador';
+
+                    return (
+                      <tr key={idSol}>
+                        <td style={styles.td}>
+                          <strong>{solicitanteNome}</strong>
+                          <br/><span style={{fontSize:'11px', color:'#888'}}>{sol.dataSolicitacao || sol.dataCriacao || 'Recente'}</span>
+                        </td>
+                        <td style={styles.td}>{nomeDoMaterial}</td>
+                        <td style={styles.td}>
+                          <span style={styles.badge(sol.tipo)}>{sol.tipo}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <i style={{fontSize:'13px', color: darkMode ? '#ccc' : '#555'}}>"{sol.observacao || 'Sem justificativa'}"</i>
+                          {sol.tipo === 'TRANSFERENCIA' && (
+                            <div style={{fontSize:'12px', marginTop:'4px', color:'#1a73e8'}}>
+                              Destino: 📍 {sol.localDestinoNome || sol.localDestino?.nome || 'Não mapeado'}
+                            </div>
+                          )}
+                        </td>
+                        <td style={styles.td}>
+                          <button disabled={loading} onClick={() => handleDecidirSolicitacao(idSol, true)} style={styles.btnAprovar}>Aprovar</button>
+                          <button disabled={loading} onClick={() => handleDecidirSolicitacao(idSol, false)} style={styles.btnReprovar}>Recusar</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -311,9 +324,8 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
               <label style={styles.label}>Local de Destino</label>
               <select value={localDestino} onChange={(e) => setLocalDestino(e.target.value)} style={styles.input}>
                 <option value="" style={{color: darkMode ? '#fff' : '#000'}}>-- Escolha o destino --</option>
-                {locais
-                  // FILTRO CRUCIAL: Remove o local correspondente onde o item já está alocado
-                  .filter(l => l.id !== Number(idLocalAtualdoMaterial))
+                {(locais || [])
+                  .filter(l => l && l.id !== Number(idLocalAtualdoMaterial))
                   .map(l => (
                     <option key={l.id} value={l.id} style={{color: darkMode ? '#fff' : '#000'}}>{l.nome}</option>
                   ))
