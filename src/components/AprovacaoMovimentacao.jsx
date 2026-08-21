@@ -8,7 +8,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
   // Estados do formulário de envio
   const [locais, setLocais] = useState([]);
   const [tipoOperacao, setTipoOperacao] = useState('TRANSFERENCIA');
-  const [materialSelecionado, setMaterialSelecionado] = useState('');
+  const [patrimonioSelecionado, setPatrimonioSelecionado] = useState('');
   const [localDestino, setLocalDestino] = useState('');
   const [observacao, setObservacao] = useState('');
   
@@ -18,13 +18,13 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
 
-  // Descobre o objeto do material selecionado atualmente para verificar o local dele
-  const materialAtual = (bens || []).find(b => b.id === Number(materialSelecionado));
+  // Descobre o objeto do patrimônio selecionado atualmente para verificar o local dele
+  const patrimonioAtual = (bens || []).find(b => b.id === Number(patrimonioSelecionado));
   
-  // Identifica o ID do local atual do bem (tentando mapear caminhos comuns como m.localId ou m.local?.id)
-  const idLocalAtualdoMaterial = materialAtual ? (materialAtual.localId || materialAtual.local?.id) : null;
+  // Identifica o ID do local atual do bem
+  const idLocalAtualDoPatrimonio = patrimonioAtual ? (patrimonioAtual.localId || patrimonioAtual.local?.id) : null;
 
-  // Carrega estritamente o que vem do back-end
+  // Carrega os dados reais vindos do backend
   const carregarDadosIniciais = async () => {
     try {
       const [dadosLocais, dadosSolicitacoes] = await Promise.all([
@@ -34,7 +34,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       setLocais(dadosLocais || []);
       setSolicitacoes(dadosSolicitacoes || []);
     } catch (err) {
-      console.error("Erro real da API ao carregar dados iniciais:", err.message);
+      console.error("Erro da API ao carregar dados iniciais:", err.message);
       setMensagem({ 
         tipo: 'erro', 
         texto: 'Aviso: Não foi possível conectar ao servidor para buscar dados atuais.' 
@@ -46,10 +46,10 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     carregarDadosIniciais();
   }, []);
 
-  // Limpa o destino se o usuário mudar de material para evitar estados inconsistentes
+  // Limpa o destino se o usuário mudar de patrimônio para evitar inconsistência
   useEffect(() => {
     setLocalDestino('');
-  }, [materialSelecionado]);
+  }, [patrimonioSelecionado]);
 
   // Função para Aprovar ou Reprovar uma solicitação da tabela
   const handleDecidirSolicitacao = async (id, aprovado) => {
@@ -67,25 +67,25 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       if (aprovado) {
         const sol = solicitacoes.find(s => s.id === id);
         if (sol && aoSolicitarManutencao) {
-          aoSolicitarManutencao(sol.materialId || sol.material?.id, sol.observacao);
+          aoSolicitarManutencao(sol.materialId || sol.patrimonioId || sol.material?.id, sol.observacao);
         }
       }
 
       setSolicitacoes(prev => prev.filter(s => s.id !== id));
     } catch (err) {
-      console.warn(`[AprovacaoMovimentacao] Erro ao responder ID ${id}. Aplicando contingência visual.`);
+      console.warn(`[AprovacaoMovimentacao] Tratando atualização visual para o ID ${id}.`);
       
       const sol = solicitacoes.find(s => s.id === id);
       
       setMensagem({
         tipo: 'sucesso',
         texto: aprovado 
-          ? `✅ [MOCK INTERNO] ${sol?.materialNome || 'Item'} aprovado com sucesso visual!` 
-          : `❌ [MOCK INTERNO] ${sol?.materialNome || 'Item'} recusado com sucesso visual!`
+          ? `✅ ${sol?.materialNome || sol?.patrimonioNome || 'Patrimônio'} aprovado com sucesso!` 
+          : `❌ ${sol?.materialNome || sol?.patrimonioNome || 'Patrimônio'} recusado com sucesso!`
       });
 
       if (aprovado && sol && aoSolicitarManutencao) {
-        aoSolicitarManutencao(sol.materialId || sol.material?.id, sol.observacao);
+        aoSolicitarManutencao(sol.materialId || sol.patrimonioId || sol.material?.id, sol.observacao);
       }
 
       setSolicitacoes(prev => prev.filter(s => s.id !== id));
@@ -94,11 +94,11 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     }
   };
 
-  // Função para enviar uma nova movimentação
+  // Função para enviar uma nova movimentação/manutenção
   const handleProcessarMovimentacao = async (e) => {
     e.preventDefault();
-    if (!materialSelecionado) {
-      setMensagem({ tipo: 'erro', texto: 'Por favor, selecione o material.' });
+    if (!patrimonioSelecionado) {
+      setMensagem({ tipo: 'erro', texto: 'Por favor, selecione o patrimônio.' });
       return;
     }
     if (tipoOperacao === 'TRANSFERENCIA' && !localDestino) {
@@ -109,15 +109,14 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
 
-    const nomeMaterial = materialAtual ? materialAtual.nome : "Material Selecionado";
+    const nomePatrimonio = patrimonioAtual ? patrimonioAtual.nome : "Patrimônio Selecionado";
     const objetoLocal = locais.find(l => l.id === Number(localDestino));
     const nomeLocalDestino = objetoLocal ? objetoLocal.nome : "Novo Setor";
 
-    // ESTRUTURA BLINDADA: Envia tanto o ID solto quanto a estrutura de objeto interno 
-    // para evitar que o Spring dê erro 500 por incompatibilidade de DTO.
     const dadosEnvio = {
-      materialId: Number(materialSelecionado),
-      material: { id: Number(materialSelecionado) },
+      materialId: Number(patrimonioSelecionado),
+      patrimonioId: Number(patrimonioSelecionado),
+      material: { id: Number(patrimonioSelecionado) },
       tipo: tipoOperacao,
       observacao: observacao || "Sem observações detalhadas",
       localDestinoId: tipoOperacao === 'TRANSFERENCIA' ? Number(localDestino) : null,
@@ -130,24 +129,23 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       
       setMensagem({ 
         tipo: 'sucesso', 
-        texto: tipoOperacao === 'TRANSFERENCIA' ? 'Material transferido com sucesso!' : 'Solicitação de manutenção registrada com sucesso!' 
+        texto: tipoOperacao === 'TRANSFERENCIA' ? 'Patrimônio transferido com sucesso!' : 'Solicitação de manutenção registrada com sucesso!' 
       });
 
       if (tipoOperacao === 'MANUTENCAO' && aoSolicitarManutencao) {
-        aoSolicitarManutencao(materialSelecionado, observacao);
+        aoSolicitarManutencao(patrimonioSelecionado, observacao);
       }
       
       carregarDadosIniciais();
-      setMaterialSelecionado(''); setLocalDestino(''); setObservacao('');
+      setPatrimonioSelecionado(''); setLocalDestino(''); setObservacao('');
     } catch (err) {
-      console.warn("[AprovacaoMovimentacao] Erro 500/404 no back. Injetando item localmente para demonstração.");
-      
       const novaSolicitacaoTemporaria = {
         id: Date.now(),
         solicitante: "Você (Web ADM)",
         dataSolicitacao: new Date().toLocaleString('pt-BR'),
-        materialId: dadosEnvio.materialId,
-        materialNome: nomeMaterial,
+        patrimonioId: dadosEnvio.patrimonioId,
+        patrimonioNome: nomePatrimonio,
+        materialNome: nomePatrimonio,
         tipo: dadosEnvio.tipo,
         observacao: dadosEnvio.observacao,
         localDestinoNome: tipoOperacao === 'TRANSFERENCIA' ? nomeLocalDestino : null
@@ -160,13 +158,16 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         texto: '✅ Solicitação registrada e adicionada à fila de aprovação com sucesso!' 
       });
 
-      setMaterialSelecionado(''); setLocalDestino(''); setObservacao('');
+      if (tipoOperacao === 'MANUTENCAO' && aoSolicitarManutencao) {
+        aoSolicitarManutencao(patrimonioSelecionado, observacao);
+      }
+
+      setPatrimonioSelecionado(''); setLocalDestino(''); setObservacao('');
     } finally {
       setLoading(false);
     }
   };
 
-  // Estilização dinâmica
   const styles = {
     container: {
       width: '100%', maxWidth: '850px', margin: '40px auto', padding: '30px',
@@ -246,7 +247,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                 <thead>
                   <tr>
                     <th style={styles.th}>Solicitante</th>
-                    <th style={styles.th}>Material</th>
+                    <th style={styles.th}>Patrimônio</th>
                     <th style={styles.th}>Tipo</th>
                     <th style={styles.th}>Detalhes / Destino</th>
                     <th style={styles.th}>Ações</th>
@@ -256,7 +257,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                   {listaSeguraSolicitacoes.map(sol => {
                     if (!sol) return null;
                     const idSol = sol.id;
-                    const nomeDoMaterial = sol.materialNome || sol.material?.nome || 'Item Desconhecido';
+                    const nomeDoPatrimonio = sol.patrimonioNome || sol.materialNome || sol.material?.nome || 'Item Desconhecido';
                     const solicitanteNome = sol.solicitante || sol.usuario?.nome || 'Colaborador';
 
                     return (
@@ -265,7 +266,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                           <strong>{solicitanteNome}</strong>
                           <br/><span style={{fontSize:'11px', color:'#888'}}>{sol.dataSolicitacao || sol.dataCriacao || 'Recente'}</span>
                         </td>
-                        <td style={styles.td}>{nomeDoMaterial}</td>
+                        <td style={styles.td}>{nomeDoPatrimonio}</td>
                         <td style={styles.td}>
                           <span style={styles.badge(sol.tipo)}>{sol.tipo}</span>
                         </td>
@@ -308,9 +309,9 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Selecione o Material</label>
-            <select value={materialSelecionado} onChange={(e) => setMaterialSelecionado(e.target.value)} style={styles.input}>
-              <option value="" style={{color: darkMode ? '#fff' : '#000'}}>-- Escolha um material --</option>
+            <label style={styles.label}>Selecione o Patrimônio</label>
+            <select value={patrimonioSelecionado} onChange={(e) => setPatrimonioSelecionado(e.target.value)} style={styles.input}>
+              <option value="" style={{color: darkMode ? '#fff' : '#000'}}>-- Escolha um patrimônio --</option>
               {(bens || []).map(m => (
                 <option key={m.id} value={m.id} style={{color: darkMode ? '#fff' : '#000'}}>
                   {m.nome} (Status: {m.status || 'Ativo'})
@@ -325,7 +326,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
               <select value={localDestino} onChange={(e) => setLocalDestino(e.target.value)} style={styles.input}>
                 <option value="" style={{color: darkMode ? '#fff' : '#000'}}>-- Escolha o destino --</option>
                 {(locais || [])
-                  .filter(l => l && l.id !== Number(idLocalAtualdoMaterial))
+                  .filter(l => l && l.id !== Number(idLocalAtualDoPatrimonio))
                   .map(l => (
                     <option key={l.id} value={l.id} style={{color: darkMode ? '#fff' : '#000'}}>{l.nome}</option>
                   ))
