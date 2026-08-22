@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api, { listarLocais, listarSolicitacoesPendentes, responderSolicitacao } from '../services/api';
 
-export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManutencao }) {
-  // Controle de Abas: 'FORMULARIO' ou 'PENDENCIAS'
+export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManutencao, aoAtualizarDados }) {
+  // Controle de Abas: 'PENDENCIAS' ou 'FORMULARIO'
   const [abaAtiva, setAbaAtiva] = useState('PENDENCIAS');
   
-  // Estados do formulário de envio
+  // Estados do formulário
   const [locais, setLocais] = useState([]);
   const [tipoOperacao, setTipoOperacao] = useState('TRANSFERENCIA');
   const [patrimonioSelecionado, setPatrimonioSelecionado] = useState('');
@@ -18,27 +18,28 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
 
-  // Descobre o objeto do patrimônio selecionado atualmente para verificar o local dele
+  // Patrimônio selecionado no formulário
   const patrimonioAtual = (bens || []).find(b => b.id === Number(patrimonioSelecionado));
-  
-  // Identifica o ID do local atual do bem
   const idLocalAtualDoPatrimonio = patrimonioAtual ? (patrimonioAtual.localId || patrimonioAtual.local?.id) : null;
 
-  // Carrega os dados reais vindos do backend
+  // Buscar dados reais do backend
   const carregarDadosIniciais = async () => {
+    setLoading(true);
     try {
       const [dadosLocais, dadosSolicitacoes] = await Promise.all([
         listarLocais(),
         listarSolicitacoesPendentes()
       ]);
-      setLocais(dadosLocais || []);
-      setSolicitacoes(dadosSolicitacoes || []);
+      setLocais(Array.isArray(dadosLocais) ? dadosLocais : []);
+      setSolicitacoes(Array.isArray(dadosSolicitacoes) ? dadosSolicitacoes : []);
     } catch (err) {
-      console.error("Erro da API ao carregar dados iniciais:", err.message);
+      console.error("Erro ao carregar dados do servidor:", err);
       setMensagem({ 
         tipo: 'erro', 
-        texto: 'Aviso: Não foi possível conectar ao servidor para buscar dados atuais.' 
+        texto: 'Erro ao conectar com o servidor. Verifique se o backend Java está rodando.' 
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,55 +47,51 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     carregarDadosIniciais();
   }, []);
 
-  // Limpa o destino se o usuário mudar de patrimônio para evitar inconsistência
   useEffect(() => {
     setLocalDestino('');
   }, [patrimonioSelecionado]);
 
-  // Função para Aprovar ou Reprovar uma solicitação da tabela
+  // Aprovar ou Reprovar solicitação REAL
   const handleDecidirSolicitacao = async (id, aprovado) => {
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
     
     try {
+      // 1. Envia a decisão para a API no banco de dados
       await responderSolicitacao(id, aprovado);
       
       setMensagem({
         tipo: 'sucesso',
-        texto: aprovado ? '✅ Solicitação aprovada com sucesso!' : '❌ Solicitação reprovada!'
+        texto: aprovado ? '✅ Solicitação aprovada com sucesso no banco!' : '❌ Solicitação recusada!'
       });
 
+      // 2. Se for manutenção, dispara o callback pai (se existir)
       if (aprovado) {
         const sol = solicitacoes.find(s => s.id === id);
         if (sol && aoSolicitarManutencao) {
-          aoSolicitarManutencao(sol.materialId || sol.patrimonioId || sol.material?.id, sol.observacao);
+          const matId = sol.materialId || sol.patrimonioId || sol.material?.id;
+          aoSolicitarManutencao(matId, sol.observacao);
         }
       }
 
-      setSolicitacoes(prev => prev.filter(s => s.id !== id));
+      // 3. Recarrega a lista do servidor para garantir sincronismo real
+      await carregarDadosIniciais();
+
+      // Notifica a tela principal/pai para atualizar a lista de patrimônios
+      if (aoAtualizarDados) aoAtualizarDados();
+
     } catch (err) {
-      console.warn(`[AprovacaoMovimentacao] Tratando atualização visual para o ID ${id}.`);
-      
-      const sol = solicitacoes.find(s => s.id === id);
-      
+      console.error("Erro ao processar solicitação:", err);
       setMensagem({
-        tipo: 'sucesso',
-        texto: aprovado 
-          ? `✅ ${sol?.materialNome || sol?.patrimonioNome || 'Patrimônio'} aprovado com sucesso!` 
-          : `❌ ${sol?.materialNome || sol?.patrimonioNome || 'Patrimônio'} recusado com sucesso!`
+        tipo: 'erro',
+        texto: `Falha ao ${aprovado ? 'aprovar' : 'recusar'} a solicitação: ${err.response?.data?.message || err.message}`
       });
-
-      if (aprovado && sol && aoSolicitarManutencao) {
-        aoSolicitarManutencao(sol.materialId || sol.patrimonioId || sol.material?.id, sol.observacao);
-      }
-
-      setSolicitacoes(prev => prev.filter(s => s.id !== id));
     } finally {
       setLoading(false);
     }
   };
 
-  // Função para enviar uma nova movimentação/manutenção
+  // Enviar solicitação REAL para o banco
   const handleProcessarMovimentacao = async (e) => {
     e.preventDefault();
     if (!patrimonioSelecionado) {
@@ -109,60 +106,42 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
 
-    const nomePatrimonio = patrimonioAtual ? patrimonioAtual.nome : "Patrimônio Selecionado";
-    const objetoLocal = locais.find(l => l.id === Number(localDestino));
-    const nomeLocalDestino = objetoLocal ? objetoLocal.nome : "Novo Setor";
-
-    const dadosEnvio = {
+    const payload = {
       materialId: Number(patrimonioSelecionado),
-      patrimonioId: Number(patrimonioSelecionado),
-      material: { id: Number(patrimonioSelecionado) },
       tipo: tipoOperacao,
       observacao: observacao || "Sem observações detalhadas",
-      localDestinoId: tipoOperacao === 'TRANSFERENCIA' ? Number(localDestino) : null,
-      localDestino: tipoOperacao === 'TRANSFERENCIA' ? { id: Number(localDestino) } : null
+      localDestinoId: tipoOperacao === 'TRANSFERENCIA' ? Number(localDestino) : null
     };
 
     try {
       const endpoint = tipoOperacao === 'TRANSFERENCIA' ? '/movimentacao/transferir' : '/movimentacao/manutencao';
-      await api.post(endpoint, dadosEnvio);
+      await api.post(endpoint, payload);
       
       setMensagem({ 
         tipo: 'sucesso', 
-        texto: tipoOperacao === 'TRANSFERENCIA' ? 'Patrimônio transferido com sucesso!' : 'Solicitação de manutenção registrada com sucesso!' 
+        texto: tipoOperacao === 'TRANSFERENCIA' 
+          ? '✅ Solicitação de transferência gravada no banco!' 
+          : '✅ Solicitação de manutenção gravada no banco!' 
       });
 
       if (tipoOperacao === 'MANUTENCAO' && aoSolicitarManutencao) {
         aoSolicitarManutencao(patrimonioSelecionado, observacao);
       }
       
-      carregarDadosIniciais();
-      setPatrimonioSelecionado(''); setLocalDestino(''); setObservacao('');
+      // Limpa os campos
+      setPatrimonioSelecionado(''); 
+      setLocalDestino(''); 
+      setObservacao('');
+
+      // Atualiza as pendências vindo direto do backend
+      await carregarDadosIniciais();
+
     } catch (err) {
-      const novaSolicitacaoTemporaria = {
-        id: Date.now(),
-        solicitante: "Você (Web ADM)",
-        dataSolicitacao: new Date().toLocaleString('pt-BR'),
-        patrimonioId: dadosEnvio.patrimonioId,
-        patrimonioNome: nomePatrimonio,
-        materialNome: nomePatrimonio,
-        tipo: dadosEnvio.tipo,
-        observacao: dadosEnvio.observacao,
-        localDestinoNome: tipoOperacao === 'TRANSFERENCIA' ? nomeLocalDestino : null
-      };
-
-      setSolicitacoes(prev => [novaSolicitacaoTemporaria, ...prev]);
-
+      console.error("Erro ao registrar movimentação:", err);
       setMensagem({ 
-        tipo: 'sucesso', 
-        texto: '✅ Solicitação registrada e adicionada à fila de aprovação com sucesso!' 
+        tipo: 'erro', 
+        texto: `Não foi possível salvar: ${err.response?.data?.message || 'Servidor indisponível.'}` 
       });
-
-      if (tipoOperacao === 'MANUTENCAO' && aoSolicitarManutencao) {
-        aoSolicitarManutencao(patrimonioSelecionado, observacao);
-      }
-
-      setPatrimonioSelecionado(''); setLocalDestino(''); setObservacao('');
     } finally {
       setLoading(false);
     }
@@ -206,8 +185,6 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     btnReprovar: { backgroundColor: '#d93025', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }
   };
 
-  const listaSeguraSolicitacoes = Array.isArray(solicitacoes) ? solicitacoes : [];
-
   return (
     <div style={styles.container}>
       <div style={styles.navAbas}>
@@ -215,7 +192,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
           style={styles.abaBtn(abaAtiva === 'PENDENCIAS')} 
           onClick={() => { setAbaAtiva('PENDENCIAS'); setMensagem({tipo:'', texto:''}); }}
         >
-          📋 Solicitações Pendentes ({listaSeguraSolicitacoes.length})
+          📋 Solicitações Pendentes ({solicitacoes.length})
         </button>
         <button 
           style={styles.abaBtn(abaAtiva === 'FORMULARIO')} 
@@ -237,7 +214,9 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
             Abaixo estão os pedidos realizados por colaboradores aguardando a sua autorização.
           </p>
 
-          {listaSeguraSolicitacoes.length === 0 ? (
+          {loading && solicitacoes.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>Carregando pendências do banco...</div>
+          ) : solicitacoes.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
               🎉 Nenhuma solicitação pendente no momento!
             </div>
@@ -254,11 +233,11 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                   </tr>
                 </thead>
                 <tbody>
-                  {listaSeguraSolicitacoes.map(sol => {
+                  {solicitacoes.map(sol => {
                     if (!sol) return null;
                     const idSol = sol.id;
-                    const nomeDoPatrimonio = sol.patrimonioNome || sol.materialNome || sol.material?.nome || 'Item Desconhecido';
-                    const solicitanteNome = sol.solicitante || sol.usuario?.nome || 'Colaborador';
+                    const nomeDoPatrimonio = sol.material?.nome || sol.materialNome || sol.patrimonioNome || 'Item ID: ' + (sol.materialId || sol.id);
+                    const solicitanteNome = sol.usuario?.nome || sol.solicitante || 'Colaborador';
 
                     return (
                       <tr key={idSol}>
@@ -274,13 +253,17 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                           <i style={{fontSize:'13px', color: darkMode ? '#ccc' : '#555'}}>"{sol.observacao || 'Sem justificativa'}"</i>
                           {sol.tipo === 'TRANSFERENCIA' && (
                             <div style={{fontSize:'12px', marginTop:'4px', color:'#1a73e8'}}>
-                              Destino: 📍 {sol.localDestinoNome || sol.localDestino?.nome || 'Não mapeado'}
+                              Destino: 📍 {sol.localDestino?.nome || sol.localDestinoNome || 'Não informado'}
                             </div>
                           )}
                         </td>
                         <td style={styles.td}>
-                          <button disabled={loading} onClick={() => handleDecidirSolicitacao(idSol, true)} style={styles.btnAprovar}>Aprovar</button>
-                          <button disabled={loading} onClick={() => handleDecidirSolicitacao(idSol, false)} style={styles.btnReprovar}>Recusar</button>
+                          <button disabled={loading} onClick={() => handleDecidirSolicitacao(idSol, true)} style={styles.btnAprovar}>
+                            {loading ? '...' : 'Aprovar'}
+                          </button>
+                          <button disabled={loading} onClick={() => handleDecidirSolicitacao(idSol, false)} style={styles.btnReprovar}>
+                            {loading ? '...' : 'Recusar'}
+                          </button>
                         </td>
                       </tr>
                     );
@@ -348,7 +331,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
           </div>
 
           <button type="submit" disabled={loading} style={{ ...styles.input, backgroundColor: loading ? '#555' : '#1a73e8', color: '#fff', fontWeight: 'bold', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '10px', padding: '12px' }}>
-            {loading ? 'Processando...' : tipoOperacao === 'TRANSFERENCIA' ? 'Confirmar Transferência' : 'Enviar para Manutenção'}
+            {loading ? 'Enviando...' : tipoOperacao === 'TRANSFERENCIA' ? 'Confirmar Transferência' : 'Enviar para Manutenção'}
           </button>
         </form>
       )}

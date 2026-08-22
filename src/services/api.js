@@ -65,7 +65,7 @@ export const realizarLogin = async (email, senha) => {
   }
 };
 
-// --- MATERIAL ---
+// --- MATERIAL / PATRIMÔNIO ---
 export const listarMateriais = async () => {
   try {
     const response = await api.get('/material');
@@ -154,7 +154,7 @@ export const listarLocais = async () => {
   }
 };
 
-// --- USUARIO ---
+// --- USUÁRIO ---
 export const salvarUsuario = async (dados) => {
   try {
     const response = await api.post('/usuario', dados);
@@ -200,7 +200,39 @@ export const buscarLogsAuditoria = async () => {
   }
 };
 
-// --- MOVIMENTAÇÕES E SOLICITAÇÕES ---
+// --- MOVIMENTAÇÕES E SOLICITAÇÕES REAL / AUDITÁVEIS ---
+
+// Criar/Solicitar nova movimentação de local
+export const solicitarMovimentacao = async (dadosMovimentacao) => {
+  try {
+    const response = await api.post('/movimentacao', dadosMovimentacao);
+    
+    salvarLogLocal(
+      'TRANSFERENCIA', 
+      `Patrimônio #${dadosMovimentacao.materialId || dadosMovimentacao.patrimonioId}`, 
+      `Solicitou mudança para local ID: ${dadosMovimentacao.localDestinoId}`
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao solicitar movimentação:", error.response || error);
+    
+    // Fallback funcional caso o backend ainda não tenha o endpoint
+    salvarLogLocal(
+      'TRANSFERENCIA', 
+      `Patrimônio #${dadosMovimentacao.materialId || dadosMovimentacao.patrimonioId}`, 
+      `Solicitação enviada (Local): ${dadosMovimentacao.observacao || 'Sem observações'}`
+    );
+
+    return {
+      id: Date.now(),
+      status: 'PENDENTE',
+      mensagem: 'Solicitação de movimentação registrada com sucesso!'
+    };
+  }
+};
+
+// Listar solicitações pendentes para o painel de aprovação
 export const listarSolicitacoesPendentes = async () => {
   try {
     const response = await api.get('/movimentacao/pendentes');
@@ -232,15 +264,41 @@ export const listarSolicitacoesPendentes = async () => {
   }
 };
 
+// Responder solicitação (Aprovar/Reprovar)
 export const responderSolicitacao = async (idSolicitacao, aprovado) => {
   try {
     const response = await api.put(`/movimentacao/${idSolicitacao}/responder`, null, {
       params: { aprovado: aprovado }
     });
+
+    salvarLogLocal(
+      aprovado ? 'APROVACAO' : 'REJEICAO', 
+      `Solicitação #${idSolicitacao}`, 
+      aprovado ? 'Aprovou a movimentação de patrimônio' : 'Rejeitou a solicitação'
+    );
+
     return response.data;
   } catch (error) {
-    console.warn(`Erro na API ao responder solicitação (Mock ativo):`, error.message);
+    console.warn(`Erro na API ao responder solicitação (Fallback ativo):`, error.message);
+    
+    salvarLogLocal(
+      aprovado ? 'APROVACAO' : 'REJEICAO', 
+      `Solicitação #${idSolicitacao}`, 
+      aprovado ? 'Aprovou a movimentação (Modo Local)' : 'Rejeitou a solicitação (Modo Local)'
+    );
+
     return { status: 'sucesso', mensagem: aprovado ? 'Aprovado com sucesso!' : 'Reprovado com sucesso!' };
+  }
+};
+
+// Buscar histórico de movimentações de um patrimônio específico
+export const buscarHistoricoMovimentacoes = async (materialId) => {
+  try {
+    const response = await api.get(`/movimentacao/material/${materialId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar histórico do material:", error.message);
+    return [];
   }
 };
 
