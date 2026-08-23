@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import api, { listarLocais, listarSolicitacoesPendentes, responderSolicitacao } from '../services/api';
+import api, { 
+  listarLocais, 
+  listarSolicitacoesPendentes, 
+  responderSolicitacao, 
+  solicitarMovimentacao 
+} from '../services/api';
 
 export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManutencao, aoAtualizarDados }) {
   // Controle de Abas: 'PENDENCIAS' ou 'FORMULARIO'
@@ -36,7 +41,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       console.error("Erro ao carregar dados do servidor:", err);
       setMensagem({ 
         tipo: 'erro', 
-        texto: 'Erro ao conectar com o servidor. Verifique se o backend Java está rodando.' 
+        texto: 'Erro ao conectar com o servidor. Verifique se a API Spring Boot está online.' 
       });
     } finally {
       setLoading(false);
@@ -51,13 +56,12 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     setLocalDestino('');
   }, [patrimonioSelecionado]);
 
-  // Aprovar ou Reprovar solicitação REAL
+  // Aprovar ou Reprovar solicitação
   const handleDecidirSolicitacao = async (id, aprovado) => {
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
     
     try {
-      // 1. Envia a decisão para a API no banco de dados
       await responderSolicitacao(id, aprovado);
       
       setMensagem({
@@ -65,7 +69,6 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         texto: aprovado ? '✅ Solicitação aprovada com sucesso no banco!' : '❌ Solicitação recusada!'
       });
 
-      // 2. Se for manutenção, dispara o callback pai (se existir)
       if (aprovado) {
         const sol = solicitacoes.find(s => s.id === id);
         if (sol && aoSolicitarManutencao) {
@@ -74,10 +77,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         }
       }
 
-      // 3. Recarrega a lista do servidor para garantir sincronismo real
       await carregarDadosIniciais();
-
-      // Notifica a tela principal/pai para atualizar a lista de patrimônios
       if (aoAtualizarDados) aoAtualizarDados();
 
     } catch (err) {
@@ -91,7 +91,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     }
   };
 
-  // Enviar solicitação REAL para o banco
+  // Enviar solicitação para o backend
   const handleProcessarMovimentacao = async (e) => {
     e.preventDefault();
     if (!patrimonioSelecionado) {
@@ -106,7 +106,9 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
 
+    // Envia tanto patrimonioId quanto materialId para suportar a DTO do Java
     const payload = {
+      patrimonioId: Number(patrimonioSelecionado),
       materialId: Number(patrimonioSelecionado),
       tipo: tipoOperacao,
       observacao: observacao || "Sem observações detalhadas",
@@ -114,33 +116,30 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     };
 
     try {
-      const endpoint = tipoOperacao === 'TRANSFERENCIA' ? '/movimentacao/transferir' : '/movimentacao/manutencao';
-      await api.post(endpoint, payload);
+      await solicitarMovimentacao(payload);
       
       setMensagem({ 
         tipo: 'sucesso', 
         texto: tipoOperacao === 'TRANSFERENCIA' 
-          ? '✅ Solicitação de transferência gravada no banco!' 
-          : '✅ Solicitação de manutenção gravada no banco!' 
+          ? '✅ Solicitação de transferência gravada com sucesso!' 
+          : '✅ Solicitação de manutenção gravada com sucesso!' 
       });
 
       if (tipoOperacao === 'MANUTENCAO' && aoSolicitarManutencao) {
         aoSolicitarManutencao(patrimonioSelecionado, observacao);
       }
       
-      // Limpa os campos
       setPatrimonioSelecionado(''); 
       setLocalDestino(''); 
       setObservacao('');
 
-      // Atualiza as pendências vindo direto do backend
       await carregarDadosIniciais();
 
     } catch (err) {
       console.error("Erro ao registrar movimentação:", err);
       setMensagem({ 
         tipo: 'erro', 
-        texto: `Não foi possível salvar: ${err.response?.data?.message || 'Servidor indisponível.'}` 
+        texto: `Não foi possível salvar: ${err.response?.data?.message || 'Servidor indisponível ou rota não autenticada.'}` 
       });
     } finally {
       setLoading(false);
@@ -236,7 +235,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                   {solicitacoes.map(sol => {
                     if (!sol) return null;
                     const idSol = sol.id;
-                    const nomeDoPatrimonio = sol.material?.nome || sol.materialNome || sol.patrimonioNome || 'Item ID: ' + (sol.materialId || sol.id);
+                    const nomeDoPatrimonio = sol.material?.nome || sol.materialNome || sol.patrimonioNome || 'Item ID: ' + (sol.materialId || sol.patrimonioId || sol.id);
                     const solicitanteNome = sol.usuario?.nome || sol.solicitante || 'Colaborador';
 
                     return (

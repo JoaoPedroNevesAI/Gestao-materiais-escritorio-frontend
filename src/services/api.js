@@ -200,76 +200,52 @@ export const buscarLogsAuditoria = async () => {
   }
 };
 
-// --- MOVIMENTAÇÕES E SOLICITAÇÕES REAL / AUDITÁVEIS ---
+// --- MOVIMENTAÇÕES E SOLICITAÇÕES REAL (SINCRONIZADAS COM O SPRING BOOT) ---
 
-// Criar/Solicitar nova movimentação de local
+// 1. Criar/Solicitar nova movimentação pendente (Mapeia SolicitarMovimentacaoRequest)
 export const solicitarMovimentacao = async (dadosMovimentacao) => {
   try {
-    const response = await api.post('/movimentacao', dadosMovimentacao);
+    const payload = {
+      patrimonioId: Number(dadosMovimentacao.patrimonioId || dadosMovimentacao.materialId),
+      localDestinoId: Number(dadosMovimentacao.localDestinoId),
+      observacao: dadosMovimentacao.observacao || ""
+    };
+
+    const response = await api.post('/solicitacao-movimentacao/solicitar', payload);
     
     salvarLogLocal(
       'TRANSFERENCIA', 
-      `Patrimônio #${dadosMovimentacao.materialId || dadosMovimentacao.patrimonioId}`, 
-      `Solicitou mudança para local ID: ${dadosMovimentacao.localDestinoId}`
+      `Patrimônio #${payload.patrimonioId}`, 
+      `Solicitou mudança para local ID: ${payload.localDestinoId}`
     );
 
     return response.data;
   } catch (error) {
     console.error("Erro ao solicitar movimentação:", error.response || error);
-    
-    // Fallback funcional caso o backend ainda não tenha o endpoint
-    salvarLogLocal(
-      'TRANSFERENCIA', 
-      `Patrimônio #${dadosMovimentacao.materialId || dadosMovimentacao.patrimonioId}`, 
-      `Solicitação enviada (Local): ${dadosMovimentacao.observacao || 'Sem observações'}`
-    );
-
-    return {
-      id: Date.now(),
-      status: 'PENDENTE',
-      mensagem: 'Solicitação de movimentação registrada com sucesso!'
-    };
+    throw error;
   }
 };
 
-// Listar solicitações pendentes para o painel de aprovação
+// 2. Listar solicitações pendentes para o painel de aprovação
 export const listarSolicitacoesPendentes = async () => {
   try {
-    const response = await api.get('/movimentacao/pendentes');
+    const response = await api.get('/solicitacao-movimentacao/pendentes');
     return response.data;
   } catch (error) {
-    console.error("Erro ao listar solicitações pendentes (Mock ativo):", error.message);
-    return [
-      { 
-        id: 101, 
-        materialNome: 'Notebook Dell Latitude', 
-        materialId: 5,
-        tipo: 'MANUTENCAO', 
-        solicitante: 'João P Neves (Mobile)', 
-        observacao: 'Tela piscando e cooler fazendo muito barulho.',
-        dataSolicitacao: '16/06/2026'
-      },
-      { 
-        id: 102, 
-        materialNome: 'Cadeira Ergonômica', 
-        materialId: 8,
-        tipo: 'TRANSFERENCIA', 
-        localDestinoNome: 'Departamento TI',
-        localDestinoId: 1,
-        solicitante: 'Lucas Cliente', 
-        observacao: 'Mudança de setor do funcionário.',
-        dataSolicitacao: '16/06/2026'
-      }
-    ];
+    console.error("Erro ao listar solicitações pendentes:", error.message);
+    return [];
   }
 };
 
-// Responder solicitação (Aprovar/Reprovar)
-export const responderSolicitacao = async (idSolicitacao, aprovado) => {
+// 3. Responder solicitação (Aprovar / Reprovar) - Mapeia AprovarMovimentacaoRequest
+export const responderSolicitacao = async (idSolicitacao, aprovado, observacaoAdmin = "") => {
   try {
-    const response = await api.put(`/movimentacao/${idSolicitacao}/responder`, null, {
-      params: { aprovado: aprovado }
-    });
+    const endpoint = `/solicitacao-movimentacao/${idSolicitacao}/${aprovado ? 'aprovar' : 'reprovar'}`;
+    const payload = {
+      observacaoAdmin: observacaoAdmin || (aprovado ? "Aprovado pelo gestor" : "Solicitação recusada")
+    };
+
+    const response = await api.put(endpoint, payload);
 
     salvarLogLocal(
       aprovado ? 'APROVACAO' : 'REJEICAO', 
@@ -279,19 +255,31 @@ export const responderSolicitacao = async (idSolicitacao, aprovado) => {
 
     return response.data;
   } catch (error) {
-    console.warn(`Erro na API ao responder solicitação (Fallback ativo):`, error.message);
-    
-    salvarLogLocal(
-      aprovado ? 'APROVACAO' : 'REJEICAO', 
-      `Solicitação #${idSolicitacao}`, 
-      aprovado ? 'Aprovou a movimentação (Modo Local)' : 'Rejeitou a solicitação (Modo Local)'
-    );
-
-    return { status: 'sucesso', mensagem: aprovado ? 'Aprovado com sucesso!' : 'Reprovado com sucesso!' };
+    console.error(`Erro na API ao responder solicitação:`, error.response || error);
+    throw error;
   }
 };
 
-// Buscar histórico de movimentações de um patrimônio específico
+// 4. Transferência Direta sem aprovação prévia (Mapeia MovimentacaoRequest)
+export const transferirPatrimonioDireto = async (dados) => {
+  try {
+    const payload = {
+      patrimonioId: Number(dados.patrimonioId || dados.materialId),
+      localDestinoId: Number(dados.localDestinoId),
+      observacao: dados.observacao || ""
+    };
+
+    const response = await api.post('/movimentacao/transferir', payload);
+    
+    salvarLogLocal('TRANSFERENCIA_DIRETA', `Patrimônio #${payload.patrimonioId}`, `Transferido direto para local ${payload.localDestinoId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Erro na transferência direta:", error.response || error);
+    throw error;
+  }
+};
+
+// 5. Buscar histórico de movimentações de um patrimônio específico
 export const buscarHistoricoMovimentacoes = async (materialId) => {
   try {
     const response = await api.get(`/movimentacao/material/${materialId}`);
