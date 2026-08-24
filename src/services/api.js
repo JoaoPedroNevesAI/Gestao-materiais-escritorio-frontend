@@ -157,10 +157,20 @@ export const listarLocais = async () => {
 // --- USUÁRIO ---
 export const salvarUsuario = async (dados) => {
   try {
-    const response = await api.post('/usuario', dados);
+    // Normalização de DTO para garantir compatibilidade com Spring Boot e Security
+    const payload = {
+      nome: dados.nome,
+      email: dados.email,
+      senha: dados.senha || 'Senha@123', // Garante uma senha válida se o formulário não passar
+      role: dados.role || (dados.tipo === 'ADM' ? 'ROLE_ADM' : 'ROLE_CLIENTE'),
+      tipo: dados.tipo || 'CLIENTE'
+    };
+
+    const response = await api.post('/usuario', payload);
+    salvarLogLocal('CREATE', `Usuário: ${dados.nome}`, 'Cadastrou novo colaborador no sistema');
     return response.data;
   } catch (error) {
-    console.error("Erro ao salvar usuário:", error.response || error);
+    console.error("Erro ao salvar usuário:", error.response?.data || error);
     throw error;
   }
 };

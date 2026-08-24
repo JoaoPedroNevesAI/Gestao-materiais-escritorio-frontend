@@ -72,7 +72,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       if (aprovado) {
         const sol = solicitacoes.find(s => s.id === id);
         if (sol && aoSolicitarManutencao) {
-          const matId = sol.materialId || sol.patrimonioId || sol.material?.id;
+          const matId = sol.materialId || sol.patrimonioId || sol.material?.id || sol.patrimonio?.id;
           aoSolicitarManutencao(matId, sol.observacao);
         }
       }
@@ -235,8 +235,27 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                   {solicitacoes.map(sol => {
                     if (!sol) return null;
                     const idSol = sol.id;
-                    const nomeDoPatrimonio = sol.material?.nome || sol.materialNome || sol.patrimonioNome || 'Item ID: ' + (sol.materialId || sol.patrimonioId || sol.id);
-                    const solicitanteNome = sol.usuario?.nome || sol.solicitante || 'Colaborador';
+
+                    // Leitura segura do DTO vindo do Spring Boot
+                    const nomeDoPatrimonio = 
+                      sol.patrimonio?.nome || 
+                      sol.material?.nome || 
+                      sol.patrimonioNome || 
+                      sol.materialNome || 
+                      `Patrimônio #${sol.patrimonioId || sol.materialId || idSol}`;
+
+                    const solicitanteNome = 
+                      sol.usuario?.nome || 
+                      sol.solicitante || 
+                      sol.usuarioNome || 
+                      'Colaborador';
+
+                    const destinoNome = 
+                      sol.localDestino?.nome || 
+                      sol.localDestinoNome || 
+                      'Não informado';
+
+                    const tipoMov = sol.tipo || 'TRANSFERENCIA';
 
                     return (
                       <tr key={idSol}>
@@ -246,13 +265,13 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                         </td>
                         <td style={styles.td}>{nomeDoPatrimonio}</td>
                         <td style={styles.td}>
-                          <span style={styles.badge(sol.tipo)}>{sol.tipo}</span>
+                          <span style={styles.badge(tipoMov)}>{tipoMov}</span>
                         </td>
                         <td style={styles.td}>
                           <i style={{fontSize:'13px', color: darkMode ? '#ccc' : '#555'}}>"{sol.observacao || 'Sem justificativa'}"</i>
-                          {sol.tipo === 'TRANSFERENCIA' && (
+                          {tipoMov === 'TRANSFERENCIA' && (
                             <div style={{fontSize:'12px', marginTop:'4px', color:'#1a73e8'}}>
-                              Destino: 📍 {sol.localDestino?.nome || sol.localDestinoNome || 'Não informado'}
+                              Destino: 📍 {destinoNome}
                             </div>
                           )}
                         </td>
