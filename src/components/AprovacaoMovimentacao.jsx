@@ -234,44 +234,48 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                 <tbody>
                   {solicitacoes.map(sol => {
                     if (!sol) return null;
-                    const idSol = sol.id;
+                    const idSol = sol.id || Math.random();
 
-                    // Leitura segura do DTO vindo do Spring Boot
-                    const nomeDoPatrimonio = 
-                      sol.patrimonio?.nome || 
-                      sol.material?.nome || 
-                      sol.patrimonioNome || 
-                      sol.materialNome || 
-                      `Patrimônio #${sol.patrimonioId || sol.materialId || idSol}`;
+                    // TRATAMENTO ANTI-CRASH DO REACT
+                    // Resolve o erro: Objects are not valid as a React child
+                    const solicitanteNome = typeof sol.usuario === 'object' && sol.usuario !== null
+                      ? (sol.usuario.nome || sol.usuario.username || sol.usuario.email)
+                      : typeof sol.solicitante === 'object' && sol.solicitante !== null
+                      ? (sol.solicitante.nome || sol.solicitante.username)
+                      : (sol.usuario || sol.solicitante || sol.usuarioNome || 'Colaborador');
 
-                    const solicitanteNome = 
-                      sol.usuario?.nome || 
-                      sol.solicitante || 
-                      sol.usuarioNome || 
-                      'Colaborador';
+                    const nomeDoPatrimonio = typeof sol.patrimonio === 'object' && sol.patrimonio !== null
+                      ? sol.patrimonio.nome
+                      : typeof sol.material === 'object' && sol.material !== null
+                      ? sol.material.nome
+                      : (sol.patrimonioNome || sol.materialNome || `Patrimônio #${sol.patrimonioId || sol.materialId || idSol}`);
 
-                    const destinoNome = 
-                      sol.localDestino?.nome || 
-                      sol.localDestinoNome || 
-                      'Não informado';
+                    const destinoNome = typeof sol.localDestino === 'object' && sol.localDestino !== null
+                      ? sol.localDestino.nome
+                      : (sol.localDestinoNome || sol.localDestino || 'Não informado');
 
-                    const tipoMov = sol.tipo || 'TRANSFERENCIA';
+                    const tipoMov = typeof sol.tipo === 'string' ? sol.tipo : 'TRANSFERENCIA';
 
                     return (
                       <tr key={idSol}>
                         <td style={styles.td}>
-                          <strong>{solicitanteNome}</strong>
-                          <br/><span style={{fontSize:'11px', color:'#888'}}>{sol.dataSolicitacao || sol.dataCriacao || 'Recente'}</span>
+                          <strong>{String(solicitanteNome)}</strong>
+                          <br/>
+                          <span style={{fontSize:'11px', color:'#888'}}>
+                            {sol.dataSolicitacao || sol.dataCriacao || 'Recente'}
+                          </span>
                         </td>
-                        <td style={styles.td}>{nomeDoPatrimonio}</td>
+                        <td style={styles.td}>{String(nomeDoPatrimonio)}</td>
                         <td style={styles.td}>
-                          <span style={styles.badge(tipoMov)}>{tipoMov}</span>
+                          <span style={styles.badge(tipoMov)}>{String(tipoMov)}</span>
                         </td>
                         <td style={styles.td}>
-                          <i style={{fontSize:'13px', color: darkMode ? '#ccc' : '#555'}}>"{sol.observacao || 'Sem justificativa'}"</i>
+                          <i style={{fontSize:'13px', color: darkMode ? '#ccc' : '#555'}}>
+                            "{sol.observacao || 'Sem justificativa'}"
+                          </i>
                           {tipoMov === 'TRANSFERENCIA' && (
                             <div style={{fontSize:'12px', marginTop:'4px', color:'#1a73e8'}}>
-                              Destino: 📍 {destinoNome}
+                              Destino: 📍 {String(destinoNome)}
                             </div>
                           )}
                         </td>
