@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 
-export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem }) {
+export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem, usuarioLogado }) {
   const [loadingId, setLoadingId] = useState(null);
   const [responsaveis, setResponsaveis] = useState({});
+
+  // Verifica se o usuário possui perfil de administrador
+  const eAdmin = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
 
   // Garantia de array válido
   const listaBens = Array.isArray(bens) ? bens : [];
@@ -20,8 +23,13 @@ export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem })
     setResponsaveis(prev => ({ ...prev, [id]: nome }));
   };
 
-  // Trata a conclusão da manutenção / retorno ao estoque
+  // Trata a conclusão da manutenção / retorno ao estoque (Exclusivo Administrador)
   const handleConcluirManutencao = async (item) => {
+    if (!eAdmin) {
+      alert("Apenas administradores podem concluir manutenções e retornar itens ao estoque.");
+      return;
+    }
+
     setLoadingId(item.id);
     const responsavelAtual = responsaveis[item.id] || item.responsavel || 'Não informado';
 
@@ -44,7 +52,7 @@ export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem })
       }
     } catch (err) {
       console.error('Erro ao atualizar status de manutenção:', err);
-      // Fallback local caso o backend ainda não tenha o endpoint 100% pronto
+      // Fallback local caso a API retorne erro no ambiente de dev
       if (onUpdateItem) {
         onUpdateItem({ ...item, status: 'ATIVO', situacao: 'ATIVO' });
       }
@@ -64,7 +72,7 @@ export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem })
     },
     header: {
       display: 'flex',
-      justifyContent: 'space-between',
+      justify: 'space-between',
       alignItems: 'center',
       marginBottom: '15px',
       borderBottom: `1px solid ${darkMode ? '#333' : '#eee'}`,
@@ -85,7 +93,7 @@ export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem })
     },
     cardItem: {
       display: 'flex',
-      justifyContent: 'space-between',
+      justify: 'space-between',
       alignItems: 'center',
       flexWrap: 'wrap',
       gap: '12px',
@@ -126,12 +134,12 @@ export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem })
       width: '150px'
     },
     btnConcluir: {
-      backgroundColor: '#2ecc71',
+      backgroundColor: eAdmin ? '#2ecc71' : '#888',
       color: '#fff',
       border: 'none',
       padding: '7px 14px',
       borderRadius: '6px',
-      cursor: 'pointer',
+      cursor: eAdmin ? 'pointer' : 'not-allowed',
       fontSize: '12px',
       fontWeight: 'bold',
       transition: 'background-color 0.2s'
@@ -173,15 +181,21 @@ export default function AlertasManutencao({ darkMode, bens = [], onUpdateItem })
                   <input
                     type="text"
                     placeholder="Técnico/Responsável"
+                    disabled={!eAdmin}
                     value={responsavelAtual}
                     onChange={(e) => handleResponsavelChange(item.id, e.target.value)}
-                    style={styles.inputResponsavel}
+                    style={{
+                      ...styles.inputResponsavel,
+                      cursor: !eAdmin ? 'not-allowed' : 'text',
+                      opacity: !eAdmin ? 0.7 : 1
+                    }}
                   />
 
                   <button
                     style={styles.btnConcluir}
-                    disabled={loadingId === item.id}
+                    disabled={loadingId === item.id || !eAdmin}
                     onClick={() => handleConcluirManutencao(item)}
+                    title={!eAdmin ? 'Apenas administradores podem dar baixa em manutenções' : ''}
                   >
                     {loadingId === item.id ? 'Salvando...' : '✓ Retornar ao Estoque'}
                   </button>

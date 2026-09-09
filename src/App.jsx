@@ -439,6 +439,7 @@ function App() {
                   darkMode={darkMode} 
                   bens={bens}
                   aoSolicitarManutencao={forcarManutencaoNoFront}
+                  usuarioLogado={usuarioLogado}
                 />
               );
             case 'auditoria':
@@ -502,7 +503,12 @@ function App() {
 
             {sidebarAberta && (
               <div style={{ padding: '12px' }}>
-                <AlertasManutencao darkMode={darkMode} bens={bens} />
+                <AlertasManutencao 
+                  darkMode={darkMode} 
+                  bens={bens} 
+                  usuarioLogado={usuarioLogado}
+                  onUpdateItem={() => listarMateriais().then(setBens)}
+                />
               </div>
             )}
           </div>

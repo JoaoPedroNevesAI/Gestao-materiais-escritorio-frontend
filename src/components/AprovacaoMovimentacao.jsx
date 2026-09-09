@@ -6,9 +6,11 @@ import api, {
   solicitarMovimentacao 
 } from '../services/api';
 
-export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManutencao, aoAtualizarDados }) {
-  // Controle de Abas: 'PENDENCIAS' ou 'FORMULARIO'
-  const [abaAtiva, setAbaAtiva] = useState('PENDENCIAS');
+export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManutencao, aoAtualizarDados, usuarioLogado }) {
+  const eAdmin = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
+
+  // Se for admin, inicia na aba de pendências. Se for colaborador, abre no formulário.
+  const [abaAtiva, setAbaAtiva] = useState(eAdmin ? 'PENDENCIAS' : 'FORMULARIO');
   
   // Estados do formulário
   const [locais, setLocais] = useState([]);
@@ -33,7 +35,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     try {
       const [dadosLocais, dadosSolicitacoes] = await Promise.all([
         listarLocais(),
-        listarSolicitacoesPendentes()
+        eAdmin ? listarSolicitacoesPendentes() : Promise.resolve([])
       ]);
       setLocais(Array.isArray(dadosLocais) ? dadosLocais : []);
       setSolicitacoes(Array.isArray(dadosSolicitacoes) ? dadosSolicitacoes : []);
@@ -50,13 +52,13 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
 
   useEffect(() => {
     carregarDadosIniciais();
-  }, []);
+  }, [eAdmin]);
 
   useEffect(() => {
     setLocalDestino('');
   }, [patrimonioSelecionado]);
 
-  // Aprovar ou Reprovar solicitação
+  // Aprovar ou Reprovar solicitação (Ação exclusiva do Administrador)
   const handleDecidirSolicitacao = async (id, aprovado) => {
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
@@ -66,9 +68,10 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       
       setMensagem({
         tipo: 'sucesso',
-        texto: aprovado ? '✅ Solicitação aprovada com sucesso no banco!' : '❌ Solicitação recusada!'
+        texto: aprovado ? '✅ Solicitação aprovada com sucesso!' : '❌ Solicitação recusada com sucesso!'
       });
 
+      // Apenas aciona manutenção secundária se for efetivamente APROVADO
       if (aprovado) {
         const sol = solicitacoes.find(s => s.id === id);
         if (sol && aoSolicitarManutencao) {
@@ -91,7 +94,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     }
   };
 
-  // Enviar solicitação para o backend
+  // Enviar solicitação para o backend (Livre para Colaborador e ADM)
   const handleProcessarMovimentacao = async (e) => {
     e.preventDefault();
     if (!patrimonioSelecionado) {
@@ -106,7 +109,6 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     setLoading(true);
     setMensagem({ tipo: '', texto: '' });
 
-    // Envia tanto patrimonioId quanto materialId para suportar a DTO do Java
     const payload = {
       patrimonioId: Number(patrimonioSelecionado),
       materialId: Number(patrimonioSelecionado),
@@ -121,8 +123,8 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       setMensagem({ 
         tipo: 'sucesso', 
         texto: tipoOperacao === 'TRANSFERENCIA' 
-          ? '✅ Solicitação de transferência gravada com sucesso!' 
-          : '✅ Solicitação de manutenção gravada com sucesso!' 
+          ? '✅ Solicitação de transferência gravada com sucesso! Aguardando aprovação do Administrador.' 
+          : '✅ Solicitação de manutenção gravada com sucesso! Aguardando aprovação do Administrador.' 
       });
 
       if (tipoOperacao === 'MANUTENCAO' && aoSolicitarManutencao) {
@@ -187,12 +189,14 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
   return (
     <div style={styles.container}>
       <div style={styles.navAbas}>
-        <button 
-          style={styles.abaBtn(abaAtiva === 'PENDENCIAS')} 
-          onClick={() => { setAbaAtiva('PENDENCIAS'); setMensagem({tipo:'', texto:''}); }}
-        >
-          📋 Solicitações Pendentes ({solicitacoes.length})
-        </button>
+        {eAdmin && (
+          <button 
+            style={styles.abaBtn(abaAtiva === 'PENDENCIAS')} 
+            onClick={() => { setAbaAtiva('PENDENCIAS'); setMensagem({tipo:'', texto:''}); }}
+          >
+            📋 Solicitações Pendentes ({solicitacoes.length})
+          </button>
+        )}
         <button 
           style={styles.abaBtn(abaAtiva === 'FORMULARIO')} 
           onClick={() => { setAbaAtiva('FORMULARIO'); setMensagem({tipo:'', texto:''}); }}
@@ -207,7 +211,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         </div>
       )}
 
-      {abaAtiva === 'PENDENCIAS' && (
+      {abaAtiva === 'PENDENCIAS' && eAdmin && (
         <div>
           <p style={{ fontSize: '14px', color: darkMode ? '#aaa' : '#666', marginBottom: '15px' }}>
             Abaixo estão os pedidos realizados por colaboradores aguardando a sua autorização.
@@ -236,8 +240,6 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                     if (!sol) return null;
                     const idSol = sol.id || Math.random();
 
-                    // TRATAMENTO ANTI-CRASH DO REACT
-                    // Resolve o erro: Objects are not valid as a React child
                     const solicitanteNome = typeof sol.usuario === 'object' && sol.usuario !== null
                       ? (sol.usuario.nome || sol.usuario.username || sol.usuario.email)
                       : typeof sol.solicitante === 'object' && sol.solicitante !== null
@@ -353,7 +355,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
           </div>
 
           <button type="submit" disabled={loading} style={{ ...styles.input, backgroundColor: loading ? '#555' : '#1a73e8', color: '#fff', fontWeight: 'bold', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '10px', padding: '12px' }}>
-            {loading ? 'Enviando...' : tipoOperacao === 'TRANSFERENCIA' ? 'Confirmar Transferência' : 'Enviar para Manutenção'}
+            {loading ? 'Enviando...' : tipoOperacao === 'TRANSFERENCIA' ? 'Solicitar Transferência' : 'Solicitar Manutenção'}
           </button>
         </form>
       )}

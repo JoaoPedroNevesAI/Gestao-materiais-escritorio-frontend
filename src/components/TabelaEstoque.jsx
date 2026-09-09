@@ -1,34 +1,40 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import ImagemAutenticada from './ImagemAutenticada'; 
+import ImagemAutenticada from './ImagemAutenticada';
 
-export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode, usuarioLogado }) {
+const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8080';
 
+export default function TabelaEstoque({ 
+  patrimonios = [], // Renomeado de materiais para patrimonios
+  aoRemover, 
+  aoEditar, 
+  darkMode, 
+  usuarioLogado 
+}) {
   const [qrVisivel, setQrVisivel] = useState(null);
+
+  // Verificação de permissões do usuário
   const podeEditar = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
 
   const formatarValor = (valor) => {
-    if (valor == null) return '0,00';
-    return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (valor == null || valor === '') return '0,00';
+    const num = Number(valor);
+    if (isNaN(num)) return '0,00';
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // FUNÇÃO CORRIGIDA: Agora limpa e formata tanto a data de aquisição quanto o prazo de manutenção para o input HTML
   const tratarItemParaEdicao = (item) => {
-    let itemFormatado = { ...item };
-    
-    // Tratando Data de Aquisição
+    const itemFormatado = { ...item };
+
     if (itemFormatado.dataAquisicao && typeof itemFormatado.dataAquisicao === 'string') {
       itemFormatado.dataAquisicao = itemFormatado.dataAquisicao.split('T')[0];
     }
-    
-    // Tratando Prazo Limite de Manutenção
-    if (itemFormatado.prazoManutencao && typeof itemFormatado.prazoManutencao === 'string') {
-      itemFormatado.prazoManutencao = itemFormatado.prazoManutencao.split('T')[0];
-    } else if (itemFormatado.prazoLimiteManutencao && typeof itemFormatado.prazoLimiteManutencao === 'string') {
-      // Fallback caso o back-end devolva com o nome da propriedade completo
-      itemFormatado.prazoManutencao = itemFormatado.prazoLimiteManutencao.split('T')[0];
+
+    const prazo = itemFormatado.prazoManutencao || itemFormatado.prazoLimiteManutencao;
+    if (prazo && typeof prazo === 'string') {
+      itemFormatado.prazoManutencao = prazo.split('T')[0];
     }
-    
+
     aoEditar(itemFormatado);
   };
 
@@ -47,7 +53,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
         <thead>
           <tr style={{ borderBottom: darkMode ? '2px solid #333' : '2px solid #eee', textAlign: 'left', color: darkMode ? '#aaa' : '#5f6368', fontSize: '14px' }}>
             <th style={{ padding: '14px 12px' }}>Imagem</th>
-            <th style={{ padding: '14px 12px' }}>Nome / Descrição</th>
+            <th style={{ padding: '14px 12px' }}>Patrimônio / Descrição</th>
             <th style={{ padding: '14px 12px' }}>Categoria</th>
             <th style={{ padding: '14px 12px' }}>Local</th>
             <th style={{ padding: '14px 12px' }}>Valor</th>
@@ -56,7 +62,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
         </thead>
 
         <tbody>
-          {materiais.length === 0 ? (
+          {patrimonios.length === 0 ? (
             <tr>
               <td 
                 colSpan={podeEditar ? 6 : 5} 
@@ -66,12 +72,15 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
               </td>
             </tr>
           ) : (
-            materiais.map(item => {
-              const nomeDaImagem = item.imagem || item.foto;
-              
+            patrimonios.map(item => {
+              // Mapeamento flexível das propriedades trazidas pelo backend
+              const nomeDaImagem = item.imagem || item.foto || item.imagemUrl || item.caminhoImagem;
               const urlCompletaImagem = nomeDaImagem 
-                ? `http://localhost:8080/uploads/${nomeDaImagem}` 
+                ? (nomeDaImagem.startsWith('http') ? nomeDaImagem : `${API_URL}/uploads/${nomeDaImagem}`)
                 : null;
+
+              const nomeCategoria = item.categoria?.nome || item.categoria || 'Geral';
+              const nomeLocal = item.local?.nome || item.local || '—';
 
               return (
                 <tr 
@@ -118,12 +127,12 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                       fontWeight: '700',
                       textTransform: 'uppercase'
                     }}>
-                      {item.categoria?.nome || 'Geral'}
+                      {nomeCategoria}
                     </span>
                   </td>
 
                   <td style={{ padding: '12px', fontSize: '14px' }}>
-                    {item.local?.nome || '—'}
+                    {nomeLocal}
                   </td>
 
                   <td style={{ padding: '12px', fontWeight: '600', fontSize: '14px' }}>
@@ -197,8 +206,9 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                       {qrVisivel === item.id && (
                         <div style={{ 
                           position: 'absolute', 
-                          bottom: '65px', 
-                          right: '110%', 
+                          top: '50%',
+                          right: '105%',
+                          transform: 'translateY(-50%)',
                           zIndex: 110, 
                           background: darkMode ? '#2d2d2d' : '#fff', 
                           padding: '16px 12px 12px 12px', 
@@ -227,8 +237,6 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                               lineHeight: '1',
                               transition: 'color 0.2s'
                             }}
-                            onMouseEnter={(e) => e.target.style.color = '#ff4d4f'}
-                            onMouseLeave={(e) => e.target.style.color = darkMode ? '#aaa' : '#5f6368'}
                           >
                             &times;
                           </button>
@@ -240,7 +248,7 @@ export default function TabelaEstoque({ materiais, aoRemover, aoEditar, darkMode
                             borderRadius: '6px'
                           }}>
                             <QRCodeSVG 
-                              value={`PATRIMONIO_ID: ${item.id}\nNOME: ${item.nome}\nLOCAL: ${item.local?.nome || 'Não Informado'}`} 
+                              value={`PATRIMONIO_ID: ${item.id}\nNOME: ${item.nome || ''}\nLOCAL: ${nomeLocal}`} 
                               size={115} 
                             />
                           </div>
