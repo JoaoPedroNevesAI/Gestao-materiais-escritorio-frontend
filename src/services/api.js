@@ -5,7 +5,7 @@ const api = axios.create({
   baseURL: 'http://localhost:8080/api'
 });
 
-// Instância alternativa (Pública) - Sem interceptor de token para testes de bypass
+// Instância alternativa (Pública)
 export const apiPublica = axios.create({
   baseURL: 'http://localhost:8080/api'
 });
@@ -15,7 +15,8 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // Garante que o formato Bearer sempre vá com o espaço correto
+      config.headers.Authorization = `Bearer ${token.trim()}`;
     }
     return config;
   },
@@ -24,14 +25,12 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor de Resposta: trata sessão expirada ou não autorizada (401)
+// Interceptor de Resposta: trata sessão expirada/inválida tanto no 401 QUANTO no 403
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      console.warn('Sessão expirada ou não autorizada. Limpando token...');
-      localStorage.removeItem('token');
-      localStorage.removeItem('usuario_patrimonio');
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      console.warn('Sessão negada ou sem permissão (401/403). Verifique as roles e o token.');
     }
     return Promise.reject(error);
   }
@@ -73,15 +72,21 @@ const salvarLogLocal = (acao, item, detalhe = '') => {
 const normalizarPayloadMaterial = (dados) => {
   const payload = { ...dados };
 
-  if (dados.categoriaId && !dados.categoria) {
+  // Tratamento limpo para categoria
+  if (dados.categoriaId) {
     payload.categoria = { id: Number(dados.categoriaId) };
-  } else if (typeof dados.categoria === 'number' || typeof dados.categoria === 'string') {
+  } else if (typeof dados.categoria === 'object' && dados.categoria?.id) {
+    payload.categoria = { id: Number(dados.categoria.id) };
+  } else if (dados.categoria) {
     payload.categoria = { id: Number(dados.categoria) };
   }
 
-  if (dados.localId && !dados.local) {
+  // Tratamento limpo para local
+  if (dados.localId) {
     payload.local = { id: Number(dados.localId) };
-  } else if (typeof dados.local === 'number' || typeof dados.local === 'string') {
+  } else if (typeof dados.local === 'object' && dados.local?.id) {
+    payload.local = { id: Number(dados.local.id) };
+  } else if (dados.local) {
     payload.local = { id: Number(dados.local) };
   }
 
@@ -242,9 +247,7 @@ export const buscarLogsAuditoria = async () => {
   }
 };
 
-// --- MOVIMENTAÇÕES E SOLICITAÇÕES (AJUSTADO PARA O NOVO CONTROLLER SPRING BOOT) ---
-
-// 1. Criar/Solicitar nova movimentação pendente
+// --- MOVIMENTAÇÕES E SOLICITAÇÕES ---
 export const solicitarMovimentacao = async (dadosMovimentacao) => {
   try {
     const payload = {
@@ -253,7 +256,6 @@ export const solicitarMovimentacao = async (dadosMovimentacao) => {
       observacao: dadosMovimentacao.observacao || ""
     };
 
-    // Rota ajustada para o novo padrão: POST /api/movimentacao
     const response = await api.post('/movimentacao', payload);
     
     salvarLogLocal(
@@ -269,7 +271,6 @@ export const solicitarMovimentacao = async (dadosMovimentacao) => {
   }
 };
 
-// 2. Listar todas as movimentações
 export const listarMovimentacoes = async () => {
   try {
     const response = await api.get('/movimentacao');
@@ -280,10 +281,8 @@ export const listarMovimentacoes = async () => {
   }
 };
 
-// 3. Listar apenas solicitações pendentes para o painel de aprovação
 export const listarSolicitacoesPendentes = async () => {
   try {
-    // Rota ajustada para: GET /api/movimentacao/pendentes
     const response = await api.get('/movimentacao/pendentes');
     return response.data;
   } catch (error) {
@@ -292,10 +291,8 @@ export const listarSolicitacoesPendentes = async () => {
   }
 };
 
-// 4. Responder solicitação (Aprovar / Reprovar)
 export const responderSolicitacao = async (idSolicitacao, aprovado, observacaoAdmin = "") => {
   try {
-    // Rota ajustada para: PUT /api/movimentacao/{id}/aprovar ou /reprovar
     const endpoint = `/movimentacao/${idSolicitacao}/${aprovado ? 'aprovar' : 'reprovar'}`;
     const payload = {
       observacaoAdmin: observacaoAdmin || (aprovado ? "Aprovado pelo gestor" : "Solicitação recusada")
@@ -316,15 +313,12 @@ export const responderSolicitacao = async (idSolicitacao, aprovado, observacaoAd
   }
 };
 
-// 5. Transferência Direta (atualmente redireciona para a mesma rota de solicitação)
 export const transferirPatrimonioDireto = async (dados) => {
   return solicitarMovimentacao(dados);
 };
 
-// 6. Buscar histórico de movimentações de um patrimônio específico
 export const buscarHistoricoMovimentacoes = async (patrimonioId) => {
   try {
-    // Rota ajustada para: GET /api/movimentacao/patrimonio/{id}
     const response = await api.get(`/movimentacao/patrimonio/${patrimonioId}`);
     return response.data;
   } catch (error) {

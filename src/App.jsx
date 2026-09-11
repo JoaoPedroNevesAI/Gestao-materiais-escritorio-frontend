@@ -67,7 +67,7 @@ function App() {
     }
   }, [abaAtiva]);
 
-  // CORREÇÃO: Limpa os sub-objetos para evitar o Erro 400 (Bad Request) na API
+  // Limpa os sub-objetos para evitar o Erro 400 (Bad Request) na API do Spring Boot
   const forcarManutencaoNoFront = async (idMaterial, motivoDefeito) => {
     try {
       const itemOriginal = bens.find(b => b.id === parseInt(idMaterial));
@@ -80,7 +80,6 @@ function App() {
         ...resto,
         status: 'MANUTENCAO',
         descricao: motivoDefeito ? `${itemOriginal.descricao || ''} (Defeito: ${motivoDefeito})` : itemOriginal.descricao,
-        // Alinha com os IDs planos que o Java espera receber
         categoriaId: categoriaId || categoria?.id || null,
         localId: localId || local?.id || null
       };
@@ -88,12 +87,10 @@ function App() {
       await atualizarMaterial(idMaterial, payloadAtualizado);
       toast.success("Item enviado para o setor de manutenção!");
       
-      // Atualiza o estado local imediatamente
       const listaAtualizada = await listarMateriais();
       setBens(listaAtualizada);
     } catch (err) {
       console.error("Erro ao persistir status de manutenção:", err);
-      // Fallback seguro caso a rota retorne erro em ambiente local
       setBens(prevBens => 
         prevBens.map(item => item.id === parseInt(idMaterial) ? { ...item, status: 'MANUTENCAO' } : item)
       );
@@ -134,17 +131,25 @@ function App() {
     toast.info("Sessão encerrada.");
   };
 
-  // Payload limpo enviado ao salvarMaterial para evitar conflito com o Java
+  // CORREÇÃO APLICADA: Payload limpo ao criar/atualizar para não dar Erro 400 no Java
   const salvarOuAtualizarBem = async (dadosMaterial, arquivoDeImagem) => {
     try {
       let materialResultado;
 
+      // Remove sub-objetos para enviar apenas os IDs puros aceitos pela DTO Java
+      const { categoria, local, localId, categoriaId, ...resto } = dadosMaterial;
+      const payloadLimpo = {
+        ...resto,
+        categoriaId: categoriaId || categoria?.id || null,
+        localId: localId || local?.id || null
+      };
+
       if (itemParaEditar) {
-        materialResultado = await atualizarMaterial(itemParaEditar.id, dadosMaterial);
+        materialResultado = await atualizarMaterial(itemParaEditar.id, payloadLimpo);
         toast.success("Patrimônio atualizado com sucesso!");
         setItemParaEditar(null);
       } else {
-        materialResultado = await salvarMaterial(dadosMaterial);
+        materialResultado = await salvarMaterial(payloadLimpo);
         toast.success(`Sucesso: ${materialResultado.nome} registrado!`);
       }
 
@@ -319,20 +324,19 @@ function App() {
               </button>
             )}
             
-            {ehAdmin && (
-              <button 
-                onClick={() => setAbaAtiva('transferencia')}
-                style={{ 
-                  padding: '12px 20px', border: 'none', 
-                  background: abaAtiva === 'transferencia' ? (darkMode ? '#1a73e822' : '#e8f0fe') : 'none', 
-                  color: abaAtiva === 'transferencia' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
-                  cursor: 'pointer', fontWeight: '600', fontSize: '13.5px',
-                  borderBottom: abaAtiva === 'transferencia' ? '3px solid #1a73e8' : '3px solid transparent'
-                }}
-              >
-                🔄 Movimentações
-              </button>
-            )}
+            {/* CORREÇÃO APLICADA: Liberado para administradores e colaboradores poderem solicitar movimentação */}
+            <button 
+              onClick={() => setAbaAtiva('transferencia')}
+              style={{ 
+                padding: '12px 20px', border: 'none', 
+                background: abaAtiva === 'transferencia' ? (darkMode ? '#1a73e822' : '#e8f0fe') : 'none', 
+                color: abaAtiva === 'transferencia' ? '#1a73e8' : (darkMode ? '#aaa' : '#555'), 
+                cursor: 'pointer', fontWeight: '600', fontSize: '13.5px',
+                borderBottom: abaAtiva === 'transferencia' ? '3px solid #1a73e8' : '3px solid transparent'
+              }}
+            >
+              🔄 Movimentações
+            </button>
 
             {ehAdmin && (
               <button 
@@ -356,14 +360,13 @@ function App() {
             case 'inventario':
               return (
                 <>
-                  {ehAdmin && (
-                    <Formulario 
-                      aoAdicionar={salvarOuAtualizarBem} 
-                      bemParaEditar={itemParaEditar} 
-                      cancelarEdicao={() => setItemParaEditar(null)}
-                      darkMode={darkMode} 
-                    />
-                  )}
+                  <Formulario 
+                    aoAdicionar={salvarOuAtualizarBem} 
+                    bemParaEditar={itemParaEditar} 
+                    cancelarEdicao={() => setItemParaEditar(null)}
+                    darkMode={darkMode} 
+                    usuarioLogado={usuarioLogado}
+                  />
                   
                   <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '24px', borderRadius: '16px', border: `1px solid ${themeStyles.borderColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
