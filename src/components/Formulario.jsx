@@ -54,7 +54,6 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         return String(dataRaw).substring(0, 10);
       };
 
-      // Mapeia variações de propriedades vindas do banco
       const dataAquisicaoBanco = bemParaEditar.dataAquisicao || bemParaEditar.data_aquisicao || '';
       const dataManutencaoBanco = 
         bemParaEditar.dataLimiteManutencao || 
@@ -130,10 +129,10 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     }
   };
 
+  // HANDLESUBMIT CORRIGIDO: Payload sanitizado para a DTO do Spring Boot
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Recupera o nome do arquivo atual para não perder a referência caso o usuário não envie uma nova foto
     const nomeImagemAtual = bemParaEditar?.imagem || bemParaEditar?.foto || null;
 
     const materialFormatado = {
@@ -144,16 +143,13 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       valor: formData.valor ? parseFloat(formData.valor) : 0.0, 
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
-      prazoManutencao: formData.dataLimiteManutencao,
       
-      // SOLUÇÃO DO BUG DA IMAGEM: Mantém a string da imagem antiga se nenhuma nova for selecionada
+      // Se não enviou arquivo novo, mantém a string da imagem legada
       imagem: imagemArquivo ? null : nomeImagemAtual,
-      foto: imagemArquivo ? null : nomeImagemAtual,
 
+      // Apenas IDs simples para evitar desserialização complexa ou Erro 400/403
       categoriaId: formData.categoriaId ? parseInt(formData.categoriaId) : null,
-      localId: formData.localId ? parseInt(formData.localId) : null,
-      categoria: formData.categoriaId ? { id: parseInt(formData.categoriaId) } : null,
-      local: formData.localId ? { id: parseInt(formData.localId) } : null
+      localId: formData.localId ? parseInt(formData.localId) : null
     };
 
     aoAdicionar(materialFormatado, imagemArquivo);
