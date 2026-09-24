@@ -62,13 +62,17 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         bemParaEditar.data_limite_manutencao ||
         '';
 
+      const catId = bemParaEditar.categoria?.id || bemParaEditar.categoriaId || '';
+      const locId = bemParaEditar.local?.id || bemParaEditar.localId || '';
+
       setFormData({
         nome: bemParaEditar.nome || '',
         descricao: bemParaEditar.descricao || '',
-        quantidade: bemParaEditar.quantidade || '',
-        categoriaId: bemParaEditar.categoria?.id || bemParaEditar.categoriaId || '',
-        localId: bemParaEditar.local?.id || bemParaEditar.localId || '', 
-        valor: bemParaEditar.valor || '',
+        quantidade: bemParaEditar.quantidade ?? '',
+        // Convertido para String para garantir seleção correta nos <select>
+        categoriaId: catId !== '' ? String(catId) : '',
+        localId: locId !== '' ? String(locId) : '', 
+        valor: bemParaEditar.valor ?? '',
         dataAquisicao: formatarDataSegura(dataAquisicaoBanco),
         dataLimiteManutencao: formatarDataSegura(dataManutencaoBanco)
       });
@@ -107,7 +111,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     const nomeCat = prompt("Digite o nome da nova Categoria:");
     if (!nomeCat || nomeCat.trim() === "") return;
     try {
-      await api.post('/categoria', { nome: nomeCat });
+      await api.post('/categoria', { nome: nomeCat.trim() });
       alert("Categoria criada com sucesso!");
       atualizarListas();
     } catch (err) {
@@ -120,7 +124,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     const nomeLoc = prompt("Digite o nome do novo Local:");
     if (!nomeLoc || nomeLoc.trim() === "") return;
     try {
-      await api.post('/local', { nome: nomeLoc });
+      await api.post('/local', { nome: nomeLoc.trim() });
       alert("Local criado com sucesso!");
       atualizarListas();
     } catch (err) {
@@ -129,7 +133,6 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     }
   };
 
-  // HANDLESUBMIT CORRIGIDO: Payload sanitizado para a DTO do Spring Boot
   const handleSubmit = (e) => {
     e.preventDefault();
     
@@ -139,7 +142,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       id: bemParaEditar?.id || null, 
       nome: formData.nome,
       descricao: formData.descricao,
-      quantidade: parseInt(formData.quantidade) || 0,
+      quantidade: parseInt(formData.quantidade, 10) || 0,
       valor: formData.valor ? parseFloat(formData.valor) : 0.0, 
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
@@ -147,13 +150,18 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       // Se não enviou arquivo novo, mantém a string da imagem legada
       imagem: imagemArquivo ? null : nomeImagemAtual,
 
-      // Apenas IDs simples para evitar desserialização complexa ou Erro 400/403
-      categoriaId: formData.categoriaId ? parseInt(formData.categoriaId) : null,
-      localId: formData.localId ? parseInt(formData.localId) : null
+      // Parse apenas no envio para números limpos ou null
+      categoriaId: formData.categoriaId ? parseInt(formData.categoriaId, 10) : null,
+      localId: formData.localId ? parseInt(formData.localId, 10) : null
     };
 
     aoAdicionar(materialFormatado, imagemArquivo);
     if (!bemParaEditar) limparCampos();
+  };
+
+  const handleDescartarEdicao = () => {
+    limparCampos();
+    if (cancelarEdicao) cancelarEdicao();
   };
 
   const styles = {
@@ -258,7 +266,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
           >
             <option value="">Selecione uma categoria</option>
             {categorias.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.nome}</option>
+              <option key={cat.id} value={String(cat.id)}>{cat.nome}</option>
             ))}
           </select>
           <button type="button" onClick={handleCriarCategoriaRapida} style={styles.btnMais}>+</button>
@@ -275,7 +283,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
           >
             <option value="">Selecione o local de alocação</option>
             {locais.map(loc => (
-              <option key={loc.id} value={loc.id}>{loc.nome}</option>
+              <option key={loc.id} value={String(loc.id)}>{loc.nome}</option>
             ))}
           </select>
           <button type="button" onClick={handleCriarLocalRapido} style={styles.btnMais}>+</button>
@@ -374,7 +382,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         </button>
 
         {bemParaEditar && (
-          <button type="button" onClick={cancelarEdicao} style={{ gridColumn: 'span 2', padding: '10px', backgroundColor: 'transparent', border: '1px solid #ff4d4f', borderRadius: '8px', color: '#ff4d4f', fontWeight: '600', cursor: 'pointer' }}>
+          <button type="button" onClick={handleDescartarEdicao} style={{ gridColumn: 'span 2', padding: '10px', backgroundColor: 'transparent', border: '1px solid #ff4d4f', borderRadius: '8px', color: '#ff4d4f', fontWeight: '600', cursor: 'pointer' }}>
             Descartar Edição
           </button>
         )}

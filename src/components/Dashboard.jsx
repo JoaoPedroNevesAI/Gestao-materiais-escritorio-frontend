@@ -12,17 +12,25 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
   const listaCategorias = Array.isArray(categorias) ? categorias : [];
   const listaLocais = Array.isArray(locais) ? locais : [];
 
+  // Helper unificado para determinar se o bem está em manutenção
+  const isBemEmManutencao = (b) => {
+    if (!b) return false;
+    const statusUpper = String(b.status || '').toUpperCase();
+    const descLower = String(b.descricao || '').toLowerCase();
+    return statusUpper === 'MANUTENCAO' || statusUpper === 'EM_MANUTENCAO' || descLower.includes('defeito');
+  };
+
   // 1. Totalizadores Absolutos
-  const totalItens = listaBens.reduce((acc, b) => acc + (parseInt(b.quantidade) || 0), 0);
+  const totalItens = listaBens.reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
   
   const emManutencao = listaBens
-    .filter(b => b.status === 'MANUTENCAO' || String(b.descricao || '').toLowerCase().includes('defeito'))
-    .reduce((acc, b) => acc + (parseInt(b.quantidade) || 0), 0);
+    .filter(isBemEmManutencao)
+    .reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
 
   const totalLocais = listaLocais.length;
 
   const valorTotalEstimado = listaBens.reduce((acc, b) => {
-    const qtd = parseInt(b.quantidade) || 0;
+    const qtd = parseInt(b.quantidade, 10) || 0;
     const precoUnitario = parseFloat(b.valor) || 0.0;
     return acc + (qtd * precoUnitario);
   }, 0);
@@ -32,10 +40,15 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
     const idCat = b.categoria?.id || b.categoriaId;
     const idLoc = b.local?.id || b.localId;
     const nomeMat = String(b.nome || '').toLowerCase();
+    const emManut = isBemEmManutencao(b);
 
     const bateCategoria = !filtroCategoria || Number(idCat) === Number(filtroCategoria);
     const bateLocal = !filtroLocal || Number(idLoc) === Number(filtroLocal);
-    const bateStatus = !filtroStatus || b.status === filtroStatus;
+    
+    let bateStatus = true;
+    if (filtroStatus === 'MANUTENCAO') bateStatus = emManut;
+    if (filtroStatus === 'ATIVO') bateStatus = !emManut;
+
     const bateBusca = !busca || nomeMat.includes(busca.toLowerCase());
 
     return bateCategoria && bateLocal && bateStatus && bateBusca;
@@ -82,7 +95,7 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
       fontSize: '16px',
       fontWeight: '700',
       display: 'flex',
-      justifyContent: 'space-between',
+      justify: 'space-between',
       alignItems: 'center',
       flexWrap: 'wrap',
       gap: '10px'
@@ -166,8 +179,8 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
             ) : (
               listaCategorias.map(cat => {
                 const qtdNaCategoria = listaBens
-                  .filter(b => (b.categoria?.id || b.categoriaId) === cat.id)
-                  .reduce((acc, b) => acc + (parseInt(b.quantidade) || 0), 0);
+                  .filter(b => Number(b.categoria?.id || b.categoriaId) === Number(cat.id))
+                  .reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
 
                 const porcentagem = totalItens > 0 ? (qtdNaCategoria / totalItens) * 100 : 0;
 
@@ -194,8 +207,8 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
             ) : (
               listaLocais.map(loc => {
                 const qtdNoLocal = listaBens
-                  .filter(b => (b.local?.id || b.localId) === loc.id)
-                  .reduce((acc, b) => acc + (parseInt(b.quantidade) || 0), 0);
+                  .filter(b => Number(b.local?.id || b.localId) === Number(loc.id))
+                  .reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
 
                 const porcentagem = totalItens > 0 ? (qtdNoLocal / totalItens) * 100 : 0;
 
@@ -269,9 +282,12 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
                 </tr>
               ) : (
                 bensFiltrados.map(b => {
-                  const nomeCat = b.categoria?.nome || listaCategorias.find(c => c.id === b.categoriaId)?.nome || 'Geral';
-                  const nomeLoc = b.local?.nome || listaLocais.find(l => l.id === b.localId)?.nome || 'Não definido';
-                  const isManutencao = b.status === 'MANUTENCAO';
+                  const idCat = b.categoria?.id || b.categoriaId;
+                  const idLoc = b.local?.id || b.localId;
+                  
+                  const nomeCat = b.categoria?.nome || listaCategorias.find(c => Number(c.id) === Number(idCat))?.nome || 'Geral';
+                  const nomeLoc = b.local?.nome || listaLocais.find(l => Number(l.id) === Number(idLoc))?.nome || 'Não definido';
+                  const isManutencao = isBemEmManutencao(b);
 
                   return (
                     <tr key={b.id}>

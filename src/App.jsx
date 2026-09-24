@@ -73,7 +73,6 @@ function App() {
       const itemOriginal = bens.find(b => b.id === parseInt(idMaterial));
       if (!itemOriginal) return;
 
-      // Remove propriedades complexas que o MaterialRequest DTO do Spring Boot rejeita
       const { categoria, local, localId, categoriaId, ...resto } = itemOriginal;
 
       const payloadAtualizado = {
@@ -131,44 +130,39 @@ function App() {
     toast.info("Sessão encerrada.");
   };
 
-  // CORREÇÃO APLICADA: Payload limpo ao criar/atualizar para não dar Erro 400 no Java
+  // FUNÇÃO ATUALIZADA
   const salvarOuAtualizarBem = async (dadosMaterial, arquivoDeImagem) => {
     try {
-      let materialResultado;
-
-      // Remove sub-objetos para enviar apenas os IDs puros aceitos pela DTO Java
-      const { categoria, local, localId, categoriaId, ...resto } = dadosMaterial;
+      const { categoria, local, localId, categoriaId, quantidade, ...resto } = dadosMaterial;
+      
       const payloadLimpo = {
         ...resto,
+        quantidade: parseInt(quantidade, 10) || 1,
         categoriaId: categoriaId || categoria?.id || null,
         localId: localId || local?.id || null
       };
 
       if (itemParaEditar) {
-        materialResultado = await atualizarMaterial(itemParaEditar.id, payloadLimpo);
-        toast.success("Patrimônio atualizado com sucesso!");
+        await atualizarMaterial(itemParaEditar.id, payloadLimpo);
+        toast.success("Patrimônio atualizado!");
         setItemParaEditar(null);
       } else {
-        materialResultado = await salvarMaterial(payloadLimpo);
-        toast.success(`Sucesso: ${materialResultado.nome} registrado!`);
+        await salvarMaterial(payloadLimpo);
+        toast.success("Patrimônio(s) cadastrado(s) com sucesso!");
       }
 
-      if (arquivoDeImagem && materialResultado?.id) {
-        const formDataUpload = new FormData();
-        formDataUpload.append('imagem', arquivoDeImagem);
-        toast.info("Enviando imagem corporativa...");
-        
-        await api.post(`/material/${materialResultado.id}/imagem`, formDataUpload, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        toast.success("Imagem vinculada com sucesso!");
-      }
-
+      // Recarrega a lista do banco para garantir que venha com todas as relações (Categoria e Local) preenchidas
       const listaAtualizada = await listarMateriais();
-      setBens(listaAtualizada);
+      setBens([...listaAtualizada]); // Cria um novo array para forçar o React a re-renderizar
+      
+      // Limpa os filtros de busca para que o usuário veja o item novo imediatamente
+      setBusca('');
+      setFiltroCategoria('');
+      setFiltroLocal('');
+
     } catch (err) {
       console.error("Erro no salvamento do material:", err);
-      toast.error("Erro ao salvar o registro ou enviar arquivo de imagem.");
+      toast.error("Erro ao salvar o registro.");
     }
   };
 
@@ -324,7 +318,6 @@ function App() {
               </button>
             )}
             
-            {/* CORREÇÃO APLICADA: Liberado para administradores e colaboradores poderem solicitar movimentação */}
             <button 
               onClick={() => setAbaAtiva('transferencia')}
               style={{ 
@@ -360,13 +353,15 @@ function App() {
             case 'inventario':
               return (
                 <>
-                  <Formulario 
-                    aoAdicionar={salvarOuAtualizarBem} 
-                    bemParaEditar={itemParaEditar} 
-                    cancelarEdicao={() => setItemParaEditar(null)}
-                    darkMode={darkMode} 
-                    usuarioLogado={usuarioLogado}
-                  />
+                  {ehAdmin && (
+                    <Formulario 
+                      aoAdicionar={salvarOuAtualizarBem} 
+                      bemParaEditar={itemParaEditar} 
+                      cancelarEdicao={() => setItemParaEditar(null)}
+                      darkMode={darkMode} 
+                      usuarioLogado={usuarioLogado}
+                    />
+                  )}
                   
                   <div className="card" style={{ backgroundColor: themeStyles.cardBg, padding: '24px', borderRadius: '16px', border: `1px solid ${themeStyles.borderColor}`, boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
@@ -453,7 +448,7 @@ function App() {
         })()}
       </div>
 
-      {/* Barra Lateral Direita Estabilizada */}
+      {/* Barra Lateral Direita */}
       {ehAdmin && (
         <div style={{ 
           width: '340px', 
@@ -470,7 +465,6 @@ function App() {
           gap: '24px'
         }}>
           
-          {/* Caixa Informativa de Alertas */}
           <div style={{
             border: `1px solid ${themeStyles.borderColor}`,
             borderRadius: '12px',
@@ -516,7 +510,6 @@ function App() {
             )}
           </div>
 
-          {/* Lista de Acessos Recentes */}
           <div style={{ flex: 1 }}>
             <ListaAcessos darkMode={darkMode} />
           </div>

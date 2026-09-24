@@ -13,10 +13,11 @@ export const apiPublica = axios.create({
 // Interceptor de Requisição: injeta o Token JWT em todas as chamadas protegidas
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    let token = localStorage.getItem('token');
     if (token) {
-      // Garante que o formato Bearer sempre vá com o espaço correto
-      config.headers.Authorization = `Bearer ${token.trim()}`;
+      // Remove 'Bearer ' caso o token já venha gravado com o prefixo
+      token = token.replace(/^Bearer\s+/i, '').trim();
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -99,12 +100,20 @@ export const realizarLogin = async (email, senha) => {
     const response = await apiPublica.post('/auth/login', { email, senha });
     console.log('LOGIN RESPONSE:', response.data);
     
-    if (response.data?.token) {
-      localStorage.setItem('token', response.data.token);
+    let token = response.data?.token || response.data?.accessToken;
+    if (token) {
+      token = token.replace(/^Bearer\s+/i, '').trim();
+      localStorage.setItem('token', token);
     }
-    if (response.data?.usuario) {
-      localStorage.setItem('usuario_patrimonio', JSON.stringify(response.data.usuario));
-    }
+    
+    // Salva o objeto do usuário inteiro para ler no app (roles, id, nome)
+    const usuarioObj = response.data?.usuario || {
+      id: response.data?.id,
+      nome: response.data?.nome,
+      email: response.data?.email,
+      role: response.data?.role
+    };
+    localStorage.setItem('usuario_patrimonio', JSON.stringify(usuarioObj));
     
     return response.data; 
   } catch (error) {
