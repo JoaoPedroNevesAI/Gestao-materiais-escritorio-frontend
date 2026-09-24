@@ -9,7 +9,7 @@ export default function Login({ aoLogar }) {
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [mostrandoCadastro, setMostrandoCadastro] = useState(false);
-  const [verSenha, setVerSenha] = useState(false); // Estado para controlar a visualização da senha
+  const [verSenha, setVerSenha] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,28 +23,42 @@ export default function Login({ aoLogar }) {
         throw new Error("Token não retornado pelo servidor");
       }
 
-      // 1. Decodifica o token para capturar o nome de usuário baseado no e-mail
-      const decoded = jwtDecode(token);
-      const nomeUsuario = decoded.sub ? decoded.sub.split('@')[0] : (dados.nome || 'Usuário');
+      let decoded = {};
+      try {
+        decoded = jwtDecode(token);
+      } catch (jwtErr) {
+        console.error("Falha ao decodificar o JWT:", jwtErr);
+        throw new Error("Token JWT inválido");
+      }
+
+      // 1. Extrai o nome do usuário com fallbacks seguros contra null/undefined
+      const sub = typeof decoded.sub === 'string' ? decoded.sub : email;
+      const nomeBase = sub.includes('@') ? sub.split('@')[0] : sub;
+      const nomeUsuario = dados?.nome || nomeBase || 'Usuário';
       const nomeFormatado = nomeUsuario.charAt(0).toUpperCase() + nomeUsuario.slice(1);
 
-      // 2. PRIORIDADE MÁXIMA: Usa a role que veio direto na resposta do JSON (dados.role).
-      let roleReal = dados?.role; 
+      // 2. Resolução da Role / Authority
+      let roleReal = dados?.role || dados?.perfil || dados?.tipo; 
 
       if (!roleReal && decoded.authorities) {
-        if (Array.isArray(decoded.authorities)) {
-          roleReal = decoded.authorities[0];
+        if (Array.isArray(decoded.authorities) && decoded.authorities.length > 0) {
+          const primeiraAuth = decoded.authorities[0];
+          roleReal = typeof primeiraAuth === 'object' ? primeiraAuth.authority : primeiraAuth;
         } else if (typeof decoded.authorities === 'string') {
           roleReal = decoded.authorities;
         }
       }
 
-      // Se mesmo assim continuar vazio, aplica o padrão seguro
+      if (!roleReal && decoded.role) {
+        roleReal = decoded.role;
+      }
+
+      // Fallback padronizado
       if (!roleReal) {
         roleReal = 'ROLE_COLABORADOR';
       }
 
-      // Envia os dados limpos e perfeitamente sincronizados para o App.jsx
+      // Envia os dados higienizados para o componente pai
       aoLogar({ 
         token: token,
         nome: nomeFormatado,
@@ -52,10 +66,10 @@ export default function Login({ aoLogar }) {
       });
 
     } catch (error) {
-      console.error("Erro na autenticação ou processamento do Token:", error);
+      console.error("Erro na autenticação:", error);
       
-      if (error.message && error.message.includes("Token")) {
-        toast.error("Erro ao ler credenciais. Contate o administrador.");
+      if (error.message && (error.message.includes("Token") || error.message.includes("JWT"))) {
+        toast.error("Erro ao processar token de acesso. Contate o suporte.");
       } else {
         toast.error("Credenciais inválidas ou erro no servidor.");
       }
@@ -129,7 +143,7 @@ export default function Login({ aoLogar }) {
             />
           </div>
 
-          {/* Senha com Visualizar Ativado */}
+          {/* Senha */}
           <div style={{ display: 'grid', gap: '6px' }}>
             <label style={{ fontSize: '13px', fontWeight: '600', color: '#ccc' }}>
               Senha
@@ -154,7 +168,6 @@ export default function Login({ aoLogar }) {
                   transition: 'border-color 0.2s'
                 }}
               />
-              {/* ÍCONE DO OLHINHO */}
               <button 
                 type="button"
                 onClick={() => setVerSenha(!verSenha)}
@@ -165,7 +178,7 @@ export default function Login({ aoLogar }) {
                   border: 'none', 
                   cursor: 'pointer', 
                   fontSize: '16px', 
-                  color: verSenha ? '#1a73e8' : '#888', // Fica azul quando ativo
+                  color: verSenha ? '#1a73e8' : '#888',
                   outline: 'none',
                   padding: '4px',
                   display: 'flex',

@@ -5,7 +5,7 @@ import ImagemAutenticada from './ImagemAutenticada';
 const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8080';
 
 export default function TabelaEstoque({ 
-  patrimonios = [], // Renomeado de materiais para patrimonios
+  patrimonios = [], 
   aoRemover, 
   aoEditar, 
   darkMode, 
@@ -13,8 +13,9 @@ export default function TabelaEstoque({
 }) {
   const [qrVisivel, setQrVisivel] = useState(null);
 
-  // Verificação de permissões do usuário
-  const podeEditar = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
+  // Permissão flexível para Administradores e Técnicos
+  const roleUpper = String(usuarioLogado?.role || '').toUpperCase();
+  const podeEditar = roleUpper.includes('ADM') || roleUpper.includes('ADMIN') || roleUpper.includes('TEC');
 
   const formatarValor = (valor) => {
     if (valor == null || valor === '') return '0,00';
@@ -35,7 +36,9 @@ export default function TabelaEstoque({
       itemFormatado.prazoManutencao = prazo.split('T')[0];
     }
 
-    aoEditar(itemFormatado);
+    if (typeof aoEditar === 'function') {
+      aoEditar(itemFormatado);
+    }
   };
 
   const estiloImagem = {
@@ -48,7 +51,7 @@ export default function TabelaEstoque({
   };
 
   return (
-    <div style={{ overflowX: 'auto', width: '100%' }}>
+    <div style={{ overflowX: 'auto', width: '100%', position: 'relative' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontFamily: 'system-ui, sans-serif' }}>
         <thead>
           <tr style={{ borderBottom: darkMode ? '2px solid #333' : '2px solid #eee', textAlign: 'left', color: darkMode ? '#aaa' : '#5f6368', fontSize: '14px' }}>
@@ -72,8 +75,8 @@ export default function TabelaEstoque({
               </td>
             </tr>
           ) : (
-            patrimonios.map(item => {
-              // Mapeamento flexível das propriedades trazidas pelo backend
+            patrimonios.filter(Boolean).map((item, index) => {
+              const itemKey = item.id || `patrimonio-${index}`;
               const nomeDaImagem = item.imagem || item.foto || item.imagemUrl || item.caminhoImagem;
               const urlCompletaImagem = nomeDaImagem 
                 ? (nomeDaImagem.startsWith('http') ? nomeDaImagem : `${API_URL}/uploads/${nomeDaImagem}`)
@@ -84,7 +87,7 @@ export default function TabelaEstoque({
 
               return (
                 <tr 
-                  key={item.id} 
+                  key={itemKey} 
                   style={{ 
                     borderBottom: darkMode ? '1px solid #2d2d2d' : '1px solid #f0f0f0',
                     transition: 'background-color 0.2s',
@@ -145,7 +148,7 @@ export default function TabelaEstoque({
                         
                         {/* Botão QR */}
                         <button 
-                          onClick={() => setQrVisivel(qrVisivel === item.id ? null : item.id)}
+                          onClick={() => setQrVisivel(qrVisivel === itemKey ? null : itemKey)}
                           style={{ 
                             padding: '6px 12px', 
                             fontSize: '12px', 
@@ -164,7 +167,7 @@ export default function TabelaEstoque({
 
                         {/* Botão Dar Baixa */}
                         <button 
-                          onClick={() => aoRemover(item.id)}
+                          onClick={() => aoRemover && aoRemover(item.id)}
                           style={{ 
                             padding: '6px 12px', 
                             fontSize: '12px',
@@ -203,18 +206,18 @@ export default function TabelaEstoque({
                       </div>
 
                       {/* POPUP DO QR CODE */}
-                      {qrVisivel === item.id && (
+                      {qrVisivel === itemKey && (
                         <div style={{ 
                           position: 'absolute', 
                           top: '50%',
-                          right: '105%',
+                          right: '110%',
                           transform: 'translateY(-50%)',
-                          zIndex: 110, 
+                          zIndex: 200, 
                           background: darkMode ? '#2d2d2d' : '#fff', 
                           padding: '16px 12px 12px 12px', 
                           border: darkMode ? '1px solid #444' : '1px solid #dadce0', 
                           borderRadius: '12px', 
-                          boxShadow: darkMode ? '0 8px 24px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.25)',
+                          boxShadow: darkMode ? '0 8px 24px rgba(0,0,0,0.6)' : '0 8px 24px rgba(0,0,0,0.25)',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -248,7 +251,7 @@ export default function TabelaEstoque({
                             borderRadius: '6px'
                           }}>
                             <QRCodeSVG 
-                              value={`PATRIMONIO_ID: ${item.id}\nNOME: ${item.nome || ''}\nLOCAL: ${nomeLocal}`} 
+                              value={`PATRIMONIO_ID: ${item.id || ''}\nNOME: ${item.nome || ''}\nLOCAL: ${nomeLocal}`} 
                               size={115} 
                             />
                           </div>
@@ -259,7 +262,7 @@ export default function TabelaEstoque({
                             color: darkMode ? '#e0e0e0' : '#3c4043', 
                             fontWeight: '600' 
                           }}>
-                            ID: {item.id}
+                            ID: {item.id || 'N/A'}
                           </div>
                         </div>
                       )}

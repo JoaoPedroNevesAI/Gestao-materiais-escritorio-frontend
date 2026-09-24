@@ -7,7 +7,9 @@ import api, {
 } from '../services/api';
 
 export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManutencao, aoAtualizarDados, usuarioLogado }) {
-  const eAdmin = usuarioLogado?.role && String(usuarioLogado.role).includes('ADM');
+  // Identifica perfil ADM de forma flexível
+  const roleUpper = String(usuarioLogado?.role || usuarioLogado?.perfil || '').toUpperCase();
+  const eAdmin = roleUpper.includes('ADM') || roleUpper.includes('ADMIN');
 
   // Se for admin, inicia na aba de pendências. Se for colaborador, abre no formulário.
   const [abaAtiva, setAbaAtiva] = useState(eAdmin ? 'PENDENCIAS' : 'FORMULARIO');
@@ -25,8 +27,11 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState({ tipo: '', texto: '' });
 
+  // Garantia de array de bens
+  const listaBens = Array.isArray(bens) ? bens : (bens?.content || []);
+
   // Patrimônio selecionado no formulário
-  const patrimonioAtual = (bens || []).find(b => b.id === Number(patrimonioSelecionado));
+  const patrimonioAtual = listaBens.find(b => Number(b.id) === Number(patrimonioSelecionado));
   const idLocalAtualDoPatrimonio = patrimonioAtual ? (patrimonioAtual.localId || patrimonioAtual.local?.id) : null;
 
   // Buscar dados reais do backend
@@ -37,13 +42,18 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         listarLocais(),
         eAdmin ? listarSolicitacoesPendentes() : Promise.resolve([])
       ]);
-      setLocais(Array.isArray(dadosLocais) ? dadosLocais : []);
-      setSolicitacoes(Array.isArray(dadosSolicitacoes) ? dadosSolicitacoes : []);
+
+      // Trata retorno de array ou paginação { content: [...] }
+      const arrayLocais = Array.isArray(dadosLocais) ? dadosLocais : (dadosLocais?.content || []);
+      const arraySolicitacoes = Array.isArray(dadosSolicitacoes) ? dadosSolicitacoes : (dadosSolicitacoes?.content || []);
+
+      setLocais(arrayLocais);
+      setSolicitacoes(arraySolicitacoes);
     } catch (err) {
       console.error("Erro ao carregar dados do servidor:", err);
       setMensagem({ 
         tipo: 'erro', 
-        texto: 'Erro ao conectar com o servidor. Verifique se a API Spring Boot está online.' 
+        texto: 'Erro ao conectar com o servidor. Verifique se a API está online.' 
       });
     } finally {
       setLoading(false);
@@ -71,7 +81,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
         texto: aprovado ? '✅ Solicitação aprovada com sucesso!' : '❌ Solicitação recusada com sucesso!'
       });
 
-      // Apenas aciona manutenção secundária se for efetivamente APROVADO
+      // Se for aprovado e for manutenção, aciona callback
       if (aprovado) {
         const sol = solicitacoes.find(s => s.id === id);
         if (sol && aoSolicitarManutencao) {
@@ -94,7 +104,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
     }
   };
 
-  // Enviar solicitação para o backend (Livre para Colaborador e ADM)
+  // Enviar solicitação para o backend
   const handleProcessarMovimentacao = async (e) => {
     e.preventDefault();
     if (!patrimonioSelecionado) {
@@ -113,7 +123,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       patrimonioId: Number(patrimonioSelecionado),
       materialId: Number(patrimonioSelecionado),
       tipo: tipoOperacao,
-      observacao: observacao || "Sem observações detalhadas",
+      observacao: observacao || (tipoOperacao === 'TRANSFERENCIA' ? "Transferência de local" : "Solicitação de manutenção"),
       localDestinoId: tipoOperacao === 'TRANSFERENCIA' ? Number(localDestino) : null
     };
 
@@ -123,8 +133,8 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       setMensagem({ 
         tipo: 'sucesso', 
         texto: tipoOperacao === 'TRANSFERENCIA' 
-          ? '✅ Solicitação de transferência gravada com sucesso! Aguardando aprovação do Administrador.' 
-          : '✅ Solicitação de manutenção gravada com sucesso! Aguardando aprovação do Administrador.' 
+          ? '✅ Solicitação de transferência registrada com sucesso! Aguardando aprovação.' 
+          : '✅ Solicitação de manutenção registrada com sucesso! Aguardando aprovação.' 
       });
 
       if (tipoOperacao === 'MANUTENCAO' && aoSolicitarManutencao) {
@@ -136,12 +146,13 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       setObservacao('');
 
       await carregarDadosIniciais();
+      if (aoAtualizarDados) aoAtualizarDados();
 
     } catch (err) {
       console.error("Erro ao registrar movimentação:", err);
       setMensagem({ 
         tipo: 'erro', 
-        texto: `Não foi possível salvar: ${err.response?.data?.message || 'Servidor indisponível ou rota não autenticada.'}` 
+        texto: `Não foi possível salvar: ${err.response?.data?.message || 'Servidor indisponível ou erro na autenticação.'}` 
       });
     } finally {
       setLoading(false);
@@ -214,11 +225,11 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
       {abaAtiva === 'PENDENCIAS' && eAdmin && (
         <div>
           <p style={{ fontSize: '14px', color: darkMode ? '#aaa' : '#666', marginBottom: '15px' }}>
-            Abaixo estão os pedidos realizados por colaboradores aguardando a sua autorização.
+            Abaixo estão os pedidos realizados por usuários aguardando a sua autorização.
           </p>
 
           {loading && solicitacoes.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>Carregando pendências do banco...</div>
+            <div style={{ textAlign: 'center', padding: '20px', color: '#888' }}>Carregando pendências...</div>
           ) : solicitacoes.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
               🎉 Nenhuma solicitação pendente no momento!
@@ -244,7 +255,7 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
                       ? (sol.usuario.nome || sol.usuario.username || sol.usuario.email)
                       : typeof sol.solicitante === 'object' && sol.solicitante !== null
                       ? (sol.solicitante.nome || sol.solicitante.username)
-                      : (sol.usuario || sol.solicitante || sol.usuarioNome || 'Colaborador');
+                      : (sol.usuario || sol.solicitante || sol.usuarioNome || 'Usuário');
 
                     const nomeDoPatrimonio = typeof sol.patrimonio === 'object' && sol.patrimonio !== null
                       ? sol.patrimonio.nome
@@ -319,9 +330,9 @@ export default function AprovacaoMovimentacao({ darkMode, bens, aoSolicitarManut
             <label style={styles.label}>Selecione o Patrimônio</label>
             <select value={patrimonioSelecionado} onChange={(e) => setPatrimonioSelecionado(e.target.value)} style={styles.input}>
               <option value="" style={{color: darkMode ? '#fff' : '#000'}}>-- Escolha um patrimônio --</option>
-              {(bens || []).map(m => (
+              {listaBens.map(m => (
                 <option key={m.id} value={m.id} style={{color: darkMode ? '#fff' : '#000'}}>
-                  {m.nome} (Status: {m.status || 'Ativo'})
+                  {m.nome || m.descricao} (Status: {m.status || m.situacao || 'Ativo'})
                 </option>
               ))}
             </select>

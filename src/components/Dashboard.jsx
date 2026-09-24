@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 
+// URL base do backend para carregar imagens
+const BASE_URL_UPLOADS = 'http://localhost:8080';
+
 export default function Dashboard({ bens = [], categorias = [], locais = [], darkMode }) {
   // Estados para Filtros Dinâmicos no Relatório
   const [filtroCategoria, setFiltroCategoria] = useState('');
@@ -7,31 +10,49 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
   const [filtroStatus, setFiltroStatus] = useState('');
   const [busca, setBusca] = useState('');
 
-  // Garantia de segurança contra arrays nulos/undefined
-  const listaBens = Array.isArray(bens) ? bens : [];
-  const listaCategorias = Array.isArray(categorias) ? categorias : [];
-  const listaLocais = Array.isArray(locais) ? locais : [];
+  // Garantia de segurança contra arrays nulos/undefined/encapsulados
+  const listaBens = Array.isArray(bens) ? bens : (bens?.content || []);
+  const listaCategorias = Array.isArray(categorias) ? categorias : (categorias?.content || []);
+  const listaLocais = Array.isArray(locais) ? locais : (locais?.content || []);
 
   // Helper unificado para determinar se o bem está em manutenção
   const isBemEmManutencao = (b) => {
     if (!b) return false;
-    const statusUpper = String(b.status || '').toUpperCase();
+    const statusUpper = String(b.status || b.statusMaterial || '').toUpperCase();
     const descLower = String(b.descricao || '').toLowerCase();
     return statusUpper === 'MANUTENCAO' || statusUpper === 'EM_MANUTENCAO' || descLower.includes('defeito');
   };
 
+  // Helper para resolver URL da Foto/Imagem do Patrimônio
+  const obterUrlImagem = (bem) => {
+    const caminho = bem.imagem || bem.caminhoImagem || bem.foto || bem.urlImagem;
+    if (!caminho) return null;
+    if (caminho.startsWith('http://') || caminho.startsWith('https://')) {
+      return caminho;
+    }
+    // Garante a barra inicial para a rota liberada no SecurityConfiguration (/imagens/**)
+    const caminhoSanitizado = caminho.startsWith('/') ? caminho : `/${caminho}`;
+    return `${BASE_URL_UPLOADS}${caminhoSanitizado}`;
+  };
+
   // 1. Totalizadores Absolutos
-  const totalItens = listaBens.reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
+  const totalItens = listaBens.reduce((acc, b) => {
+    const qtd = parseInt(b.quantidade || b.quantidadeEstoque || 1, 10);
+    return acc + (isNaN(qtd) ? 0 : qtd);
+  }, 0);
   
   const emManutencao = listaBens
     .filter(isBemEmManutencao)
-    .reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
+    .reduce((acc, b) => {
+      const qtd = parseInt(b.quantidade || b.quantidadeEstoque || 1, 10);
+      return acc + (isNaN(qtd) ? 0 : qtd);
+    }, 0);
 
   const totalLocais = listaLocais.length;
 
   const valorTotalEstimado = listaBens.reduce((acc, b) => {
-    const qtd = parseInt(b.quantidade, 10) || 0;
-    const precoUnitario = parseFloat(b.valor) || 0.0;
+    const qtd = parseInt(b.quantidade || b.quantidadeEstoque || 1, 10);
+    const precoUnitario = parseFloat(b.valor || b.preco || b.valorEstimado) || 0.0;
     return acc + (qtd * precoUnitario);
   }, 0);
 
@@ -39,7 +60,7 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
   const bensFiltrados = listaBens.filter(b => {
     const idCat = b.categoria?.id || b.categoriaId;
     const idLoc = b.local?.id || b.localId;
-    const nomeMat = String(b.nome || '').toLowerCase();
+    const nomeMat = String(b.nome || b.descricao || '').toLowerCase();
     const emManut = isBemEmManutencao(b);
 
     const bateCategoria = !filtroCategoria || Number(idCat) === Number(filtroCategoria);
@@ -95,7 +116,7 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
       fontSize: '16px',
       fontWeight: '700',
       display: 'flex',
-      justify: 'space-between',
+      justifyContent: 'space-between',
       alignItems: 'center',
       flexWrap: 'wrap',
       gap: '10px'
@@ -137,10 +158,19 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
       padding: '12px 10px', textAlign: 'left', color: darkMode ? '#aaa' : '#555',
       fontWeight: '600', fontSize: '12px', textTransform: 'uppercase'
     },
-    td: { borderBottom: `1px solid ${darkMode ? '#2d2d2d' : '#eee'}`, padding: '12px 10px', color: darkMode ? '#e0e0e0' : '#444' },
+    td: { borderBottom: `1px solid ${darkMode ? '#2d2d2d' : '#eee'}`, padding: '12px 10px', color: darkMode ? '#e0e0e0' : '#444', verticalAlign: 'middle' },
     btnExportar: {
       backgroundColor: '#1a73e8', color: '#fff', border: 'none', padding: '8px 16px',
       borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px'
+    },
+    imgThumb: {
+      width: '40px',
+      height: '40px',
+      objectFit: 'cover',
+      borderRadius: '6px',
+      border: `1px solid ${darkMode ? '#444' : '#ddd'}`,
+      backgroundColor: darkMode ? '#333' : '#f9f9f9',
+      display: 'block'
     }
   };
 
@@ -180,7 +210,7 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
               listaCategorias.map(cat => {
                 const qtdNaCategoria = listaBens
                   .filter(b => Number(b.categoria?.id || b.categoriaId) === Number(cat.id))
-                  .reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
+                  .reduce((acc, b) => acc + (parseInt(b.quantidade || b.quantidadeEstoque || 1, 10) || 0), 0);
 
                 const porcentagem = totalItens > 0 ? (qtdNaCategoria / totalItens) * 100 : 0;
 
@@ -208,7 +238,7 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
               listaLocais.map(loc => {
                 const qtdNoLocal = listaBens
                   .filter(b => Number(b.local?.id || b.localId) === Number(loc.id))
-                  .reduce((acc, b) => acc + (parseInt(b.quantidade, 10) || 0), 0);
+                  .reduce((acc, b) => acc + (parseInt(b.quantidade || b.quantidadeEstoque || 1, 10) || 0), 0);
 
                 const porcentagem = totalItens > 0 ? (qtdNoLocal / totalItens) * 100 : 0;
 
@@ -265,6 +295,7 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
             <thead>
               <tr>
                 <th style={styles.th}>ID</th>
+                <th style={styles.th}>Foto</th>
                 <th style={styles.th}>Patrimônio</th>
                 <th style={styles.th}>Categoria</th>
                 <th style={styles.th}>Localização</th>
@@ -276,7 +307,7 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
             <tbody>
               {bensFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '20px' }}>
+                  <td colSpan="8" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '20px' }}>
                     Nenhum registro encontrado para consolidação gerencial.
                   </td>
                 </tr>
@@ -288,16 +319,36 @@ export default function Dashboard({ bens = [], categorias = [], locais = [], dar
                   const nomeCat = b.categoria?.nome || listaCategorias.find(c => Number(c.id) === Number(idCat))?.nome || 'Geral';
                   const nomeLoc = b.local?.nome || listaLocais.find(l => Number(l.id) === Number(idLoc))?.nome || 'Não definido';
                   const isManutencao = isBemEmManutencao(b);
+                  const urlFoto = obterUrlImagem(b);
+                  const qtd = parseInt(b.quantidade || b.quantidadeEstoque || 1, 10);
+                  const valorUnitario = parseFloat(b.valor || b.preco || b.valorEstimado) || 0;
 
                   return (
                     <tr key={b.id}>
                       <td style={styles.td}>#{b.id}</td>
-                      <td style={styles.td}><strong>{b.nome}</strong></td>
+                      <td style={styles.td}>
+                        {urlFoto ? (
+                          <img 
+                            src={urlFoto} 
+                            alt={b.nome || 'Patrimônio'} 
+                            style={styles.imgThumb}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/40?text=📦';
+                            }} 
+                          />
+                        ) : (
+                          <div style={{ ...styles.imgThumb, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
+                            📦
+                          </div>
+                        )}
+                      </td>
+                      <td style={styles.td}><strong>{b.nome || b.descricao || 'Sem nome'}</strong></td>
                       <td style={styles.td}>{nomeCat}</td>
                       <td style={styles.td}>{nomeLoc}</td>
-                      <td style={styles.td}>{b.quantidade || 0}</td>
+                      <td style={styles.td}>{isNaN(qtd) ? 0 : qtd}</td>
                       <td style={styles.td}>
-                        {(parseFloat(b.valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        {valorUnitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
                       <td style={styles.td}>
                         <span style={{

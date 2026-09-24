@@ -13,9 +13,12 @@ export default function ListaAcessos({ darkMode }) {
     setCarregando(true);
     try {
       const dados = await listarUsuarios();
-      const listaOriginal = Array.isArray(dados) ? dados : (dados?.content || []);
+      const listaOriginal = Array.isArray(dados) 
+        ? dados 
+        : (dados?.content || dados?.data || []);
 
       const usuariosMapeados = listaOriginal.map(user => {
+        if (!user) return null;
         const roleStr = String(user.tipo || user.role || user.perfil || '').toUpperCase();
         const ehAdmin = roleStr.includes('ADM') || roleStr.includes('ADMIN');
 
@@ -38,12 +41,11 @@ export default function ListaAcessos({ darkMode }) {
           online: ehAdmin, // Mantido destaque visual para ADMs
           cargo: cargoExibicao
         };
-      });
+      }).filter(Boolean);
 
       setUsuarios(usuariosMapeados);
     } catch (err) {
       console.error("Erro ao carregar lista de acessos:", err);
-      // Mantém lista vazia sem quebrar a renderização do React
       setUsuarios([]);
     } finally {
       setCarregando(false);
@@ -60,7 +62,6 @@ export default function ListaAcessos({ darkMode }) {
 
     setEnviando(true);
     try {
-      // Tenta enviar o convite/cadastro via API se a rota existir
       if (api && typeof api.post === 'function') {
         await api.post('/usuarios/convite', { email, tipo: 'COLABORADOR' });
       }
@@ -71,7 +72,6 @@ export default function ListaAcessos({ darkMode }) {
         alert(`Convite enviado para ${email}.`);
       }
 
-      // Adiciona localmente na lista para atualização imediata de UI
       const novoUsuario = {
         id: Date.now(),
         nome: email.split('@')[0],

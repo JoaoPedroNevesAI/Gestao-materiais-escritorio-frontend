@@ -21,11 +21,11 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
 
   const atualizarListas = () => {
     listarCategorias()
-      .then(dados => setCategorias(dados))
+      .then(dados => setCategorias(dados || []))
       .catch(err => console.error("Erro ao buscar categorias no formulário:", err));
 
     listarLocais()
-      .then(dados => setLocais(dados))
+      .then(dados => setLocais(dados || []))
       .catch(err => console.error("Erro ao buscar locais no formulário:", err));
   };
 
@@ -69,7 +69,6 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
         nome: bemParaEditar.nome || '',
         descricao: bemParaEditar.descricao || '',
         quantidade: bemParaEditar.quantidade ?? '',
-        // Convertido para String para garantir seleção correta nos <select>
         categoriaId: catId !== '' ? String(catId) : '',
         localId: locId !== '' ? String(locId) : '', 
         valor: bemParaEditar.valor ?? '',
@@ -78,7 +77,7 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       });
       
       const nomeImagem = bemParaEditar.imagem || bemParaEditar.foto;
-      setImagePreview(nomeImagem ? `http://localhost:8080/uploads/${nomeImagem}` : '');
+      setImagePreview(nomeImagem ? (nomeImagem.startsWith('blob:') ? nomeImagem : `http://localhost:8080/uploads/${nomeImagem}`) : '');
       setImagemArquivo(null);
     } else {
       limparCampos();
@@ -137,6 +136,8 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
     e.preventDefault();
     
     const nomeImagemAtual = bemParaEditar?.imagem || bemParaEditar?.foto || null;
+    const catEncontrada = categorias.find(c => String(c.id) === String(formData.categoriaId));
+    const locEncontrado = locais.find(l => String(l.id) === String(formData.localId));
 
     const materialFormatado = {
       id: bemParaEditar?.id || null, 
@@ -147,12 +148,15 @@ export default function Formulario({ aoAdicionar, bemParaEditar, cancelarEdicao,
       dataAquisicao: formData.dataAquisicao,
       dataLimiteManutencao: formData.dataLimiteManutencao,
       
-      // Se não enviou arquivo novo, mantém a string da imagem legada
-      imagem: imagemArquivo ? null : nomeImagemAtual,
+      // Se tiver imagem local recém-enviada, cria preview seguro
+      imagem: imagemArquivo ? imagePreview : nomeImagemAtual,
 
-      // Parse apenas no envio para números limpos ou null
       categoriaId: formData.categoriaId ? parseInt(formData.categoriaId, 10) : null,
-      localId: formData.localId ? parseInt(formData.localId, 10) : null
+      localId: formData.localId ? parseInt(formData.localId, 10) : null,
+
+      // Garante objeto aninhado para exibição rápida na tabela
+      categoria: catEncontrada ? catEncontrada : { id: formData.categoriaId, nome: 'Geral' },
+      local: locEncontrado ? locEncontrado : { id: formData.localId, nome: 'Geral' }
     };
 
     aoAdicionar(materialFormatado, imagemArquivo);

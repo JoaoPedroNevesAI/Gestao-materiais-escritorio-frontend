@@ -87,19 +87,30 @@ export default function CadastroUsuario({ aoFinalizar }) {
 
     try {
       await salvarUsuario(novoUsuario);
-      toast.success("Colaborador cadastrado com sucesso!");
+      toast.success("Usuário cadastrado com sucesso!");
 
       if (aoFinalizar) aoFinalizar(); 
     } catch (error) {
       console.error("Erro ao cadastrar usuário:", error);
       
-      if (error.response && (error.response.status === 500 || error.response.status === 404)) {
+      const msgErro = error.message || "";
+      const msgServidor = (error.response?.data?.message || error.response?.data || "").toString().toLowerCase();
+
+      // Tratamento amigável para e-mail já existente
+      if (
+        msgErro.includes("Já existe uma conta") ||
+        msgServidor.includes("email") ||
+        msgServidor.includes("duplicado") ||
+        msgServidor.includes("cadastrado") ||
+        error.response?.status === 409 ||
+        error.response?.status === 400
+      ) {
+        toast.error("Já existe uma conta cadastrada com este e-mail.");
+      } else if (error.response && (error.response.status === 500 || error.response.status === 404)) {
         toast.info("[Mock Mode]: Cadastro processado localmente na interface!");
         if (aoFinalizar) setTimeout(aoFinalizar, 1000);
-      } else if (error.response && error.response.status === 400) {
-        toast.error("Erro ao cadastrar: Verifique se o e-mail já está em uso.");
       } else {
-        toast.error("Erro de conexão com o servidor.");
+        toast.error("Erro ao realizar o cadastro. Verifique os dados e tente novamente.");
       }
     } finally {
       setLoading(false); 
@@ -143,10 +154,10 @@ export default function CadastroUsuario({ aoFinalizar }) {
         {/* Título */}
         <div style={{ textAlign: 'center', marginBottom: '25px' }}>
           <h2 style={{ color: 'var(--primary-color, #1a73e8)', margin: 0, fontWeight: '700', fontSize: '26px' }}>
-            👤 Novo Colaborador
+            👤 Novo Usuário
           </h2>
           <p style={{ color: '#aaa', fontSize: '14px', marginTop: '6px' }}>
-            Crie uma account de colaborador para aceder ao sistema
+            Crie uma conta de usuário para aceder ao sistema
           </p>
         </div>
 
@@ -268,7 +279,7 @@ export default function CadastroUsuario({ aoFinalizar }) {
             </div>
           )}
 
-          {/* CONFIRMAR SENHA (CORRIGIDO: Agora com olho independente) */}
+          {/* CONFIRMAR SENHA */}
           <div style={{ display: 'grid', gap: '6px' }}>
             <label style={{ fontSize: '13px', fontWeight: '600', color: '#ccc' }}>Confirme a Senha</label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>

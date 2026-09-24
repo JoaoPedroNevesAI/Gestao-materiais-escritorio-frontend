@@ -10,13 +10,13 @@ export const apiPublica = axios.create({
   baseURL: 'http://localhost:8080/api'
 });
 
-// Interceptor de Requisição: injeta o Token JWT em todas as chamadas protegidas
+// Interceptor de Requisição: injeta o Token JWT sanitizado em todas as chamadas protegidas
 api.interceptors.request.use(
   (config) => {
     let token = localStorage.getItem('token');
     if (token) {
-      // Remove 'Bearer ' caso o token já venha gravado com o prefixo
-      token = token.replace(/^Bearer\s+/i, '').trim();
+      // Limpa aspas ou o prefixo Bearer duplicado
+      token = token.replace(/^Bearer\s+/i, '').replace(/^"|"$/g, '').trim();
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -48,7 +48,7 @@ const obterUsuarioAtual = () => {
   } catch (e) {
     console.error("Erro ao ler sessão do localStorage para auditoria", e);
   }
-  return 'Luis'; 
+  return 'Usuário'; 
 };
 
 // --- HELPER LOCAL PARA INJETAR LOGS EM TEMPO REAL NO FRONT ---
@@ -102,7 +102,7 @@ export const realizarLogin = async (email, senha) => {
     
     let token = response.data?.token || response.data?.accessToken;
     if (token) {
-      token = token.replace(/^Bearer\s+/i, '').trim();
+      token = token.replace(/^Bearer\s+/i, '').replace(/^"|"$/g, '').trim();
       localStorage.setItem('token', token);
     }
     
@@ -225,11 +225,27 @@ export const salvarUsuario = async (dados) => {
     };
 
     const response = await api.post('/usuario', payload);
-    salvarLogLocal('CREATE', `Usuário: ${dados.nome}`, 'Cadastrou novo colaborador no sistema');
+    salvarLogLocal('CREATE', `Usuário: ${dados.nome}`, 'Cadastrou novo usuário no sistema');
     return response.data;
   } catch (error) {
     console.error("Erro ao salvar usuário:", error.response?.data || error);
-    throw error;
+    
+    // Tratamento amigável para erro de e-mail duplicado/já cadastrado
+    const msgServidor = (typeof error.response?.data === 'string' 
+      ? error.response.data 
+      : error.response?.data?.message || '').toLowerCase();
+
+    if (
+      error.response?.status === 409 || 
+      error.response?.status === 400 || 
+      msgServidor.includes('email') || 
+      msgServidor.includes('cadastrado') ||
+      msgServidor.includes('duplicado')
+    ) {
+      throw new Error('Já existe uma conta cadastrada com este e-mail.');
+    }
+    
+    throw new Error(error.response?.data?.message || 'Erro de conexão com o servidor ao cadastrar usuário.');
   }
 };
 

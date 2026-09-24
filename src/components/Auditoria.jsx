@@ -15,13 +15,17 @@ export default function Auditoria({ darkMode }) {
     setErro(false);
     try {
       const dados = await buscarLogsAuditoria();
-      const lista = Array.isArray(dados) ? dados : (dados?.content || []);
       
-      // Garante que as ações mais recentes fiquem no topo
+      // Garante extração correta de array independente do formato retornado
+      const lista = Array.isArray(dados) 
+        ? dados 
+        : (dados?.content || dados?.data || []);
+      
+      // Garante ordenação decrescente por data sem quebrar em valores nulos
       const dadosOrdenados = [...lista].sort((a, b) => {
-        const dataA = new Date(a.data || a.timestamp || a.createdAt || 0);
-        const dataB = new Date(b.data || b.timestamp || b.createdAt || 0);
-        return dataB - dataA;
+        const timestampA = new Date(a.data || a.timestamp || a.createdAt || a.dataHora || 0).getTime();
+        const timestampB = new Date(b.data || b.timestamp || b.createdAt || b.dataHora || 0).getTime();
+        return (isNaN(timestampB) ? 0 : timestampB) - (isNaN(timestampA) ? 0 : timestampA);
       });
 
       setLogs(dadosOrdenados);
@@ -38,7 +42,7 @@ export default function Auditoria({ darkMode }) {
     carregarLogs();
   }, []);
 
-  // Helper para formatar a data
+  // Helper para formatar a data com tratamento contra datas inválidas
   const formatarData = (dataString) => {
     if (!dataString) return '—';
     try {
@@ -56,11 +60,11 @@ export default function Auditoria({ darkMode }) {
     }
   };
 
-  // Helper para tags de ação
+  // Helper para formatar e colorir tags de ação
   const obterEstiloTag = (acao) => {
     const acaoStr = String(acao || '').toUpperCase();
 
-    if (acaoStr.includes('CADAS') || acaoStr.includes('CREAT') || acaoStr.includes('INSER')) {
+    if (acaoStr.includes('CADAS') || acaoStr.includes('CREAT') || acaoStr.includes('INSER') || acaoStr.includes('SALV')) {
       return {
         bg: darkMode ? '#1b4721' : '#e6f4ea',
         texto: darkMode ? '#81c784' : '#137333',
@@ -81,17 +85,18 @@ export default function Auditoria({ darkMode }) {
     };
   };
 
-  // Filtragem local
+  // Filtragem local inteligente
   const logsFiltrados = logs.filter(log => {
+    if (!log) return false;
+
     const usuarioNome = typeof log.usuario === 'object' && log.usuario !== null
       ? (log.usuario.nome || log.usuario.username || log.usuario.email)
       : String(log.usuario || log.usuarioNome || 'Sistema');
 
-    const itemNome = typeof log.item === 'object' && log.item !== null
-      ? (log.item.nome || log.item.descricao)
-      : typeof log.patrimonio === 'object' && log.patrimonio !== null
-      ? log.patrimonio.nome
-      : String(log.item || log.patrimonio || log.itemNome || '');
+    const itemObj = log.item || log.patrimonio || log.material || log.bem;
+    const itemNome = typeof itemObj === 'object' && itemObj !== null
+      ? (itemObj.nome || itemObj.descricao)
+      : String(itemObj || log.itemNome || log.descricao || '');
 
     const acaoStr = String(log.acao || '').toLowerCase();
     const termoBusca = busca.toLowerCase();
@@ -121,7 +126,7 @@ export default function Auditoria({ darkMode }) {
       fontSize: '16px',
       fontWeight: '700',
       display: 'flex',
-      justifyContent: 'space-between',
+      justify: 'space-between',
       alignItems: 'center',
       flexWrap: 'wrap',
       gap: '10px'
@@ -225,16 +230,14 @@ export default function Auditoria({ darkMode }) {
                 const idLog = log.id || `log-${index}`;
                 const configTag = obterEstiloTag(log.acao);
 
-                // Tratamento anti-crash para usuário e item
                 const usuarioNome = typeof log.usuario === 'object' && log.usuario !== null
                   ? (log.usuario.nome || log.usuario.username || log.usuario.email)
                   : (log.usuario || log.usuarioNome || 'Sistema');
 
-                const itemNome = typeof log.item === 'object' && log.item !== null
-                  ? (log.item.nome || log.item.descricao)
-                  : typeof log.patrimonio === 'object' && log.patrimonio !== null
-                  ? log.patrimonio.nome
-                  : (log.item || log.patrimonio || log.itemNome || 'Item não identificado');
+                const itemObj = log.item || log.patrimonio || log.material || log.bem;
+                const itemNome = typeof itemObj === 'object' && itemObj !== null
+                  ? (itemObj.nome || itemObj.descricao)
+                  : (itemObj || log.itemNome || log.descricao || 'Item não identificado');
 
                 return (
                   <tr key={idLog} style={styles.row}>
@@ -265,7 +268,7 @@ export default function Auditoria({ darkMode }) {
                     
                     {/* Timestamp do Evento */}
                     <td style={{ padding: '14px 10px', ...styles.subText }}>
-                      {formatarData(log.data || log.timestamp || log.createdAt)}
+                      {formatarData(log.data || log.timestamp || log.createdAt || log.dataHora)}
                     </td>
                   </tr>
                 );
