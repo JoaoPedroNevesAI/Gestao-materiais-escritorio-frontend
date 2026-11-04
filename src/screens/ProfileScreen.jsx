@@ -14,6 +14,14 @@ import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
 
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+};
+
 export default function ProfileScreen() {
   const { usuario, logout, updateUsuario } = useAuth();
 
@@ -34,19 +42,23 @@ export default function ProfileScreen() {
   const mostrarToast = (mensagem, tipo = "erro") =>
     setToast({ visivel: true, tipo, mensagem });
 
-  useEffect(() => {
-    setNome(usuario?.nome || "");
-    setEmail(usuario?.email || "");
-    setTelefone(usuario?.telefone || "");
-  }, [usuario]);
-
   const mascaraTelefone = (valor) => {
-    return valor
+    if (!valor) return "";
+    return String(valor)
       .replace(/\D/g, "")
       .replace(/(\d{2})(\d)/, "($1) $2")
       .replace(/(\d{5})(\d{1,4})$/, "$1-$2")
       .slice(0, 15);
   };
+
+  // Carrega dados do contexto (telefone pode vir como telefone ou celular)
+  useEffect(() => {
+    if (!usuario) return;
+    setNome(usuario.nome || "");
+    setEmail(usuario.email || "");
+    const telRaw = usuario.telefone ?? usuario.celular ?? "";
+    setTelefone(mascaraTelefone(telRaw));
+  }, [usuario]);
 
   const validar = () => {
     if (!nome.trim() || !email.trim()) {
@@ -87,20 +99,39 @@ export default function ProfileScreen() {
 
     if (!validar()) return;
 
+    const telefoneLimpo = telefone.replace(/\D/g, "") || null;
+
+    const payload = {
+      nome: nome.trim(),
+      email: email.trim(),
+      telefone: telefoneLimpo,
+    };
+
     setLoading(true);
     try {
-      const payload = {
-        nome: nome.trim(),
-        email: email.trim(),
-        telefone: telefone.replace(/\D/g, "") || null,
-      };
-
       const response = await api.put(`/usuario/${idUsuario}`, payload);
-      const usuarioAtualizado = response.data || { ...usuario, ...payload };
+
+      // Garante que o telefone não some se o back não devolver o campo
+      const dadosBack = response?.data && typeof response.data === "object"
+        ? response.data
+        : {};
+
+      const usuarioAtualizado = {
+        ...usuario,
+        ...dadosBack,
+        ...payload, // payload ganha: telefone/nome/email que acabamos de salvar
+        telefone:
+          dadosBack.telefone ??
+          dadosBack.celular ??
+          payload.telefone,
+      };
 
       if (updateUsuario) {
         await updateUsuario(usuarioAtualizado);
       }
+
+      // Mantém máscara na tela
+      setTelefone(mascaraTelefone(usuarioAtualizado.telefone || ""));
 
       mostrarToast("Perfil atualizado com sucesso!", "sucesso");
     } catch (error) {
@@ -112,6 +143,11 @@ export default function ProfileScreen() {
     }
   };
 
+  const telefoneExibicao =
+    telefone ||
+    mascaraTelefone(usuario?.telefone || usuario?.celular || "") ||
+    "Não informado";
+
   return (
     <div style={styles.container}>
       <Toast
@@ -121,7 +157,6 @@ export default function ProfileScreen() {
         onClose={() => setToast((t) => ({ ...t, visivel: false }))}
       />
 
-      {/* Modal de Confirmação de Saída */}
       {modalSair && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
@@ -154,7 +189,6 @@ export default function ProfileScreen() {
       )}
 
       <div style={styles.scrollContent}>
-        {/* Card Hero do Usuário */}
         <div style={styles.heroCard}>
           <div style={styles.avatarRing}>
             <div style={styles.avatar}>
@@ -169,6 +203,12 @@ export default function ProfileScreen() {
             {usuario?.email || "sem e-mail cadastrado"}
           </p>
 
+          {/* Telefone visível no card */}
+          <div style={styles.heroTelefone}>
+            <IoCallOutline size={14} color={IFPE.primary} />
+            <span>{telefoneExibicao}</span>
+          </div>
+
           <div
             style={{
               ...styles.badgeRole,
@@ -176,29 +216,22 @@ export default function ProfileScreen() {
             }}
           >
             {isAdm ? (
-              <IoShieldCheckmark size={13} color="#1d4ed8" />
+              <IoShieldCheckmark size={13} color={IFPE.primaryText} />
             ) : (
-              <IoPerson size={13} color="#047857" />
+              <IoPerson size={13} color={IFPE.primaryText} />
             )}
-            <span
-              style={{
-                ...styles.badgeRoleText,
-                ...(isAdm ? styles.badgeAdmText : styles.badgeColabText),
-              }}
-            >
+            <span style={styles.badgeRoleText}>
               {isAdm ? "ADMINISTRADOR" : "COLABORADOR"}
             </span>
           </div>
         </div>
 
-        {/* Card Formulário de Edição */}
         <div style={styles.card}>
           <div style={styles.sectionHeaderBox}>
-            <IoCreateOutline size={18} color="#2563eb" />
+            <IoCreateOutline size={18} color={IFPE.primary} />
             <span style={styles.sectionHeaderTitle}>DADOS CADASTRAIS</span>
           </div>
 
-          {/* Nome */}
           <label style={styles.label}>NOME COMPLETO</label>
           <div
             style={{
@@ -208,7 +241,7 @@ export default function ProfileScreen() {
           >
             <IoPersonOutline
               size={18}
-              color={camposFocados.nome ? "#2563eb" : "#94a3b8"}
+              color={camposFocados.nome ? IFPE.primary : "#94a3b8"}
               style={styles.inputIcon}
             />
             <input
@@ -221,7 +254,6 @@ export default function ProfileScreen() {
             />
           </div>
 
-          {/* E-mail */}
           <label style={styles.label}>E-MAIL</label>
           <div
             style={{
@@ -231,7 +263,7 @@ export default function ProfileScreen() {
           >
             <IoMailOutline
               size={18}
-              color={camposFocados.email ? "#2563eb" : "#94a3b8"}
+              color={camposFocados.email ? IFPE.primary : "#94a3b8"}
               style={styles.inputIcon}
             />
             <input
@@ -246,8 +278,7 @@ export default function ProfileScreen() {
             />
           </div>
 
-          {/* Telefone */}
-          <label style={styles.label}>TELEFONE</label>
+          <label style={styles.label}>TELEFONE (WHATSAPP)</label>
           <div
             style={{
               ...styles.inputWrapper,
@@ -256,7 +287,7 @@ export default function ProfileScreen() {
           >
             <IoCallOutline
               size={18}
-              color={camposFocados.telefone ? "#2563eb" : "#94a3b8"}
+              color={camposFocados.telefone ? IFPE.primary : "#94a3b8"}
               style={styles.inputIcon}
             />
             <input
@@ -271,10 +302,10 @@ export default function ProfileScreen() {
                 setCamposFocados((f) => ({ ...f, telefone: false }))
               }
               placeholder="(81) 90000-0000"
+              maxLength={15}
             />
           </div>
 
-          {/* Botão Salvar */}
           <button
             type="button"
             style={{
@@ -295,7 +326,6 @@ export default function ProfileScreen() {
           </button>
         </div>
 
-        {/* Card Logout */}
         <div style={styles.cardLogout}>
           <button
             type="button"
@@ -318,7 +348,7 @@ export default function ProfileScreen() {
         </div>
 
         <p style={styles.footerVersion}>
-          IF Escritório • Conectado como{" "}
+          IF Escritório • IFPE •{" "}
           {isAdm ? "Administrador" : "Colaborador"}
         </p>
       </div>
@@ -338,8 +368,6 @@ const styles = {
     maxWidth: 520,
     margin: "0 auto",
   },
-
-  // Hero Card
   heroCard: {
     backgroundColor: "#ffffff",
     borderRadius: 20,
@@ -355,18 +383,18 @@ const styles = {
     width: 86,
     height: 86,
     borderRadius: 43,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    border: "2px solid #bfdbfe",
+    border: `2px solid ${IFPE.primaryBorder}`,
     marginBottom: 12,
   },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -387,6 +415,15 @@ const styles = {
     fontSize: 13,
     color: "#64748b",
     marginTop: 2,
+    marginBottom: 6,
+  },
+  heroTelefone: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 13,
+    color: IFPE.primaryText,
+    fontWeight: 600,
     marginBottom: 12,
   },
   badgeRole: {
@@ -395,26 +432,16 @@ const styles = {
     gap: 5,
     padding: "5px 12px",
     borderRadius: 20,
+    backgroundColor: IFPE.primaryLight,
   },
-  badgeAdm: {
-    backgroundColor: "#dbeafe",
-  },
-  badgeColab: {
-    backgroundColor: "#d1fae5",
-  },
+  badgeAdm: {},
+  badgeColab: {},
   badgeRoleText: {
     fontSize: 11.5,
     fontWeight: 700,
     letterSpacing: 0.4,
+    color: IFPE.primaryText,
   },
-  badgeAdmText: {
-    color: "#1d4ed8",
-  },
-  badgeColabText: {
-    color: "#047857",
-  },
-
-  // Card Formulário
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 20,
@@ -434,7 +461,7 @@ const styles = {
   sectionHeaderTitle: {
     fontSize: 12,
     fontWeight: 800,
-    color: "#2563eb",
+    color: IFPE.primary,
     letterSpacing: 0.8,
   },
   label: {
@@ -456,7 +483,7 @@ const styles = {
     height: 48,
   },
   inputWrapperFocado: {
-    borderColor: "#2563eb",
+    borderColor: IFPE.primary,
     backgroundColor: "#ffffff",
   },
   inputIcon: {
@@ -475,7 +502,7 @@ const styles = {
   },
   btnSalvar: {
     width: "100%",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     borderRadius: 14,
     height: 48,
     display: "flex",
@@ -484,7 +511,7 @@ const styles = {
     marginTop: 22,
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+    boxShadow: "0 4px 12px rgba(21, 128, 61, 0.3)",
   },
   btnSalvarDisabled: {
     opacity: 0.65,
@@ -509,14 +536,11 @@ const styles = {
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
   },
-
-  // Card Logout
   cardLogout: {
     backgroundColor: "#ffffff",
     borderRadius: 20,
     border: "1px solid #fee2e2",
     overflow: "hidden",
-    boxShadow: "0 2px 6px rgba(239, 68, 68, 0.04)",
     marginBottom: 20,
   },
   btnLogout: {
@@ -554,8 +578,6 @@ const styles = {
     color: "#94a3b8",
     marginTop: 1,
   },
-
-  // Modal
   modalOverlay: {
     position: "fixed",
     inset: 0,
@@ -626,9 +648,7 @@ const styles = {
     fontWeight: 700,
     fontSize: 14,
     cursor: "pointer",
-    boxShadow: "0 3px 8px rgba(239, 68, 68, 0.3)",
   },
-
   footerVersion: {
     textAlign: "center",
     fontSize: 11,

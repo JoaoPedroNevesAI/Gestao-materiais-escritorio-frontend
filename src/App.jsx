@@ -33,6 +33,7 @@ import SolicitacoesPendentesScreen from "./screens/SolicitacoesPendentesScreen";
 import QrCodeScannerScreen from "./screens/QrCodeScannerScreen";
 import NotificacoesScreen from "./screens/NotificacoesScreen";
 import ManutencaoFormScreen from "./screens/ManutencaoFormScreen";
+import DashboardScreen from "./screens/DashboardScreen";
 // ====================== LAYOUT COM HEADER ======================
 function Header({ title, showBack = false, rightAction = null }) {
   const navigate = useNavigate();
@@ -239,6 +240,15 @@ function AppRoutes() {
               </>
             }
           />
+          <Route
+  path="*"
+  element={
+    <Navigate
+      to={usuario.role === "ROLE_ADM" ? "/dashboard" : "/materiais"}
+      replace
+    />
+  }
+/>
         </Route>
 
         {/* ===== MOVIMENTAÇÕES (só ADM) ===== */}

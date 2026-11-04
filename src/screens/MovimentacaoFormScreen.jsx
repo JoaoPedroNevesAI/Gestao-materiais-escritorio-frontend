@@ -11,10 +11,21 @@ import {
   IoCheckmarkCircle,
   IoLocation,
   IoPerson,
+  IoSend,
 } from "react-icons/io5";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
+
+// Cores IFPE
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+  accent: "#16a34a",
+};
 
 export default function MovimentacaoFormScreen() {
   const navigate = useNavigate();
@@ -111,18 +122,29 @@ export default function MovimentacaoFormScreen() {
 
     setLoading(true);
     try {
+      const payloadBase = {
+        localDestinoId: localSelecionado.id,
+        observacao: observacao || null,
+      };
+
+      // Se o back esperar solicitanteId no ADM, descomente:
+      // if (isAdm && usuarioSelecionado?.id) {
+      //   payloadBase.solicitanteId = usuarioSelecionado.id;
+      // }
+
       if (patrimonios && patrimonios.length > 0) {
         await Promise.all(
           patrimonios.map((pat) =>
             api.post("/movimentacao", {
+              ...payloadBase,
               patrimonioId: pat.id,
-              localDestinoId: localSelecionado.id,
-              observacao: observacao || null,
             })
           )
         );
         mostrarToast(
-          `${patrimonios.length} solicitações enviadas com sucesso!`,
+          isAdm
+            ? `${patrimonios.length} transferência(s) confirmada(s)!`
+            : `${patrimonios.length} solicitação(ões) enviada(s)! Aguardando aprovação.`,
           "sucesso"
         );
       } else {
@@ -131,16 +153,23 @@ export default function MovimentacaoFormScreen() {
           : material?.patrimonios?.[0]?.id || material?.id;
 
         await api.post("/movimentacao", {
+          ...payloadBase,
           patrimonioId: targetPatrimonioId,
-          localDestinoId: localSelecionado.id,
-          observacao: observacao || null,
         });
-        mostrarToast("Transferência solicitada com sucesso!", "sucesso");
+        mostrarToast(
+          isAdm
+            ? "Transferência confirmada com sucesso!"
+            : "Solicitação de transferência enviada! Aguardando aprovação do administrador.",
+          "sucesso"
+        );
       }
       setTimeout(() => navigate("/materiais"), 1500);
     } catch (error) {
       const msg =
-        error.response?.data?.message || "Erro ao realizar transferência.";
+        error.response?.data?.message ||
+        (isAdm
+          ? "Erro ao confirmar transferência."
+          : "Erro ao enviar solicitação de transferência.");
       mostrarToast(msg, "erro");
     } finally {
       setLoading(false);
@@ -165,7 +194,7 @@ export default function MovimentacaoFormScreen() {
 
           <div style={styles.modalHeader}>
             <div style={styles.modalHeaderIconBox}>
-              <IconHeader size={18} color="#2563eb" />
+              <IconHeader size={18} color={IFPE.primary} />
             </div>
             <h3 style={styles.modalTitulo}>{titulo}</h3>
           </div>
@@ -198,7 +227,7 @@ export default function MovimentacaoFormScreen() {
                       {item.nome}
                     </span>
                     {isSelected && (
-                      <IoCheckmarkCircle size={18} color="#2563eb" />
+                      <IoCheckmarkCircle size={18} color={IFPE.primary} />
                     )}
                   </button>
                 );
@@ -224,6 +253,19 @@ export default function MovimentacaoFormScreen() {
     ? patrimonios[0].local?.nome || "Não definido"
     : material?.local?.nome || "Não definido";
 
+  const textoBotao = isAdm
+    ? "CONFIRMAR TRANSFERÊNCIA"
+    : "SOLICITAR TRANSFERÊNCIA";
+
+  const tagCard =
+    patrimonios && patrimonios.length > 0
+      ? isAdm
+        ? "TRANSFERÊNCIA EM LOTE"
+        : "SOLICITAÇÃO EM LOTE"
+      : isAdm
+      ? "TRANSFERÊNCIA"
+      : "SOLICITAÇÃO DE TRANSFERÊNCIA";
+
   return (
     <div style={styles.page}>
       <Toast
@@ -237,12 +279,8 @@ export default function MovimentacaoFormScreen() {
         {/* Card do material */}
         <div style={styles.materialCard}>
           <div style={styles.materialTagRow}>
-            <IoCube size={14} color="#2563eb" />
-            <span style={styles.materialLabel}>
-              {patrimonios && patrimonios.length > 0
-                ? "TRANSFERÊNCIA EM LOTE"
-                : "PATRIMÔNIO"}
-            </span>
+            <IoCube size={14} color={IFPE.primary} />
+            <span style={styles.materialLabel}>{tagCard}</span>
           </div>
 
           <h2 style={styles.materialNome}>{material?.nome || "Material"}</h2>
@@ -251,7 +289,7 @@ export default function MovimentacaoFormScreen() {
             <div style={styles.patrimoniosChipsContainer}>
               {patrimonios.map((p) => (
                 <div key={p.id} style={styles.patrimonioChip}>
-                  <IoBarcodeOutline size={12} color="#2563eb" />
+                  <IoBarcodeOutline size={12} color={IFPE.primary} />
                   <span style={styles.patrimonioChipText}>
                     {p.codigoPatrimonio}
                   </span>
@@ -260,7 +298,7 @@ export default function MovimentacaoFormScreen() {
             </div>
           ) : patrimonio ? (
             <div style={styles.patrimonioChip}>
-              <IoBarcodeOutline size={12} color="#2563eb" />
+              <IoBarcodeOutline size={12} color={IFPE.primary} />
               <span style={styles.patrimonioChipText}>
                 {patrimonio.codigoPatrimonio}
               </span>
@@ -273,11 +311,16 @@ export default function MovimentacaoFormScreen() {
               Local atual: <strong style={styles.bold}>{localAtualNome}</strong>
             </span>
           </div>
+
+          {!isAdm && (
+            <p style={styles.avisoColab}>
+              Sua solicitação ficará pendente até a aprovação de um administrador.
+            </p>
+          )}
         </div>
 
         {/* Card Formulário */}
         <div style={styles.formCard}>
-          {/* Seletor de Usuário (só ADM) */}
           {isAdm && (
             <>
               <label style={styles.label}>SOLICITANTE RESPONSÁVEL *</label>
@@ -294,7 +337,7 @@ export default function MovimentacaoFormScreen() {
                   <div style={styles.selectorLeft}>
                     <IoPersonOutline
                       size={18}
-                      color="#2563eb"
+                      color={IFPE.primary}
                       style={{ marginRight: 10 }}
                     />
                     <span
@@ -315,7 +358,6 @@ export default function MovimentacaoFormScreen() {
             </>
           )}
 
-          {/* Seletor de Local Destino */}
           <label style={styles.label}>NOVO LOCAL DE DESTINO *</label>
           {loadingLocais ? (
             <div style={styles.loadingRow}>
@@ -330,7 +372,7 @@ export default function MovimentacaoFormScreen() {
               <div style={styles.selectorLeft}>
                 <IoBusinessOutline
                   size={18}
-                  color="#2563eb"
+                  color={IFPE.primary}
                   style={{ marginRight: 10 }}
                 />
                 <span
@@ -349,7 +391,6 @@ export default function MovimentacaoFormScreen() {
             </button>
           )}
 
-          {/* Observação */}
           <label style={styles.label}>
             JUSTIFICATIVA / OBSERVAÇÃO (OPCIONAL)
           </label>
@@ -370,7 +411,6 @@ export default function MovimentacaoFormScreen() {
             />
           </div>
 
-          {/* Botão */}
           <button
             type="button"
             style={{
@@ -384,15 +424,18 @@ export default function MovimentacaoFormScreen() {
               <div style={styles.spinner} />
             ) : (
               <div style={styles.buttonContent}>
-                <IoSwapHorizontal size={19} color="#fff" />
-                <span style={styles.buttonText}>CONFIRMAR TRANSFERÊNCIA</span>
+                {isAdm ? (
+                  <IoSwapHorizontal size={19} color="#fff" />
+                ) : (
+                  <IoSend size={17} color="#fff" />
+                )}
+                <span style={styles.buttonText}>{textoBotao}</span>
               </div>
             )}
           </button>
         </div>
       </div>
 
-      {/* Modais */}
       {renderModal(
         modalVisible,
         setModalVisible,
@@ -443,7 +486,7 @@ const styles = {
   },
   materialLabel: {
     fontSize: 11,
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 800,
     letterSpacing: 0.6,
   },
@@ -463,16 +506,16 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "3px 8px",
     borderRadius: 8,
-    border: "1px solid #bfdbfe",
+    border: `1px solid ${IFPE.primaryBorder}`,
     marginBottom: 8,
   },
   patrimonioChipText: {
     fontSize: 11.5,
     fontWeight: 700,
-    color: "#1e40af",
+    color: IFPE.primaryText,
   },
   origemRow: {
     display: "flex",
@@ -488,6 +531,16 @@ const styles = {
   bold: {
     fontWeight: 700,
     color: "#0f172a",
+  },
+  avisoColab: {
+    margin: "12px 0 0 0",
+    fontSize: 12,
+    color: IFPE.primaryDark,
+    backgroundColor: IFPE.primaryLight,
+    border: `1px solid ${IFPE.primaryBorder}`,
+    borderRadius: 10,
+    padding: "10px 12px",
+    lineHeight: 1.4,
   },
   formCard: {
     backgroundColor: "#ffffff",
@@ -541,7 +594,7 @@ const styles = {
     marginBottom: 20,
   },
   inputWrapperFocado: {
-    borderColor: "#2563eb",
+    borderColor: IFPE.primary,
     backgroundColor: "#ffffff",
   },
   inputMultiline: {
@@ -558,7 +611,7 @@ const styles = {
   },
   button: {
     width: "100%",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     borderRadius: 14,
     height: 50,
     display: "flex",
@@ -566,7 +619,7 @@ const styles = {
     alignItems: "center",
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+    boxShadow: "0 4px 12px rgba(21, 128, 61, 0.3)",
     marginTop: 4,
   },
   buttonDisabled: {
@@ -601,12 +654,11 @@ const styles = {
     width: 22,
     height: 22,
     border: "2.5px solid #e2e8f0",
-    borderTop: "2.5px solid #2563eb",
+    borderTop: `2.5px solid ${IFPE.primary}`,
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
   },
 
-  // Modal
   modalOverlay: {
     position: "fixed",
     inset: 0,
@@ -645,7 +697,7 @@ const styles = {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -675,7 +727,7 @@ const styles = {
     textAlign: "left",
   },
   modalItemSelected: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
   },
   modalItemText: {
     fontSize: 14.5,
@@ -683,7 +735,7 @@ const styles = {
     fontWeight: 500,
   },
   modalItemTextSelected: {
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 700,
   },
   modalVazio: {

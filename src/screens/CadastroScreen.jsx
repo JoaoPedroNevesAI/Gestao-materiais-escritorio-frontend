@@ -10,9 +10,20 @@ import {
   IoEyeOutline,
   IoEyeOffOutline,
   IoCheckmarkCircleOutline,
+  IoShieldCheckmarkOutline,
+  IoPeopleOutline,
 } from "react-icons/io5";
 import api from "../services/api";
 import Toast from "../components/Toast";
+
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+  pageBg: "#14532d",
+};
 
 export default function CadastroScreen() {
   const navigate = useNavigate();
@@ -23,6 +34,8 @@ export default function CadastroScreen() {
   const [senha, setSenha] = useState("");
   const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [telefone, setTelefone] = useState("");
+  // Perfil: COLABORADOR | ADMINISTRADOR (ajuste se o back usar ROLE_ADM etc.)
+  const [tipo, setTipo] = useState("COLABORADOR");
   const [loading, setLoading] = useState(false);
   const [camposFocados, setCamposFocados] = useState({});
   const [toast, setToast] = useState({
@@ -31,10 +44,9 @@ export default function CadastroScreen() {
     mensagem: "",
   });
 
-  const mostrarToast = (mensagem, tipo = "erro") =>
-    setToast({ visivel: true, tipo, mensagem });
+  const mostrarToast = (mensagem, tipoToast = "erro") =>
+    setToast({ visivel: true, tipo: tipoToast, mensagem });
 
-  // Máscaras
   const mascaraCPF = (valor) => {
     return valor
       .replace(/\D/g, "")
@@ -97,15 +109,27 @@ export default function CadastroScreen() {
     if (!validar()) return;
     setLoading(true);
     try {
+      // Se o back esperar "ROLE_ADM" / "ROLE_COLABORADOR", troque o map abaixo
+      const tipoPayload =
+        tipo === "ADMINISTRADOR" ? "ADMINISTRADOR" : "COLABORADOR";
+      // Alternativa comum no Spring:
+      // const tipoPayload = tipo === "ADMINISTRADOR" ? "ROLE_ADM" : "ROLE_COLABORADOR";
+
       await api.post("/usuario", {
         nome: nome.trim(),
         cpf: cpf.replace(/\D/g, ""),
-        email,
+        email: email.trim(),
         senha,
         telefone: telefone.replace(/\D/g, "") || null,
-        tipo: "COLABORADOR",
+        tipo: tipoPayload,
       });
-      mostrarToast("Conta criada com sucesso! Faça login.", "sucesso");
+
+      mostrarToast(
+        tipo === "ADMINISTRADOR"
+          ? "Conta de administrador criada! Faça login."
+          : "Conta de colaborador criada! Faça login.",
+        "sucesso"
+      );
       setTimeout(() => navigate("/login"), 1500);
     } catch (error) {
       console.error(error);
@@ -140,6 +164,8 @@ export default function CadastroScreen() {
   };
 
   const infoForca = forcaSenha();
+  const corFoco = (campo) =>
+    camposFocados[campo] ? IFPE.primary : "#94a3b8";
 
   return (
     <div style={styles.page}>
@@ -151,7 +177,6 @@ export default function CadastroScreen() {
       />
 
       <div style={styles.container}>
-        {/* Top bar */}
         <div style={styles.topBar}>
           <button
             type="button"
@@ -162,15 +187,69 @@ export default function CadastroScreen() {
           </button>
           <div style={styles.headerInfo}>
             <h1 style={styles.headerTitle}>Criar Conta</h1>
-            <p style={styles.headerSubtitle}>Cadastro de novo colaborador</p>
+            <p style={styles.headerSubtitle}>
+              {tipo === "ADMINISTRADOR"
+                ? "Cadastro de administrador"
+                : "Cadastro de colaborador"}
+            </p>
           </div>
         </div>
 
-        {/* Card do Formulário */}
         <div style={styles.card}>
-          <h2 style={styles.sectionHeader}>DADOS PESSOAIS</h2>
+          {/* ===== TIPO DE CONTA ===== */}
+          <h2 style={styles.sectionHeader}>TIPO DE CONTA *</h2>
+          <div style={styles.tipoRow}>
+            <button
+              type="button"
+              style={{
+                ...styles.tipoBtn,
+                ...(tipo === "COLABORADOR" ? styles.tipoBtnAtivo : {}),
+              }}
+              onClick={() => setTipo("COLABORADOR")}
+            >
+              <IoPeopleOutline
+                size={20}
+                color={tipo === "COLABORADOR" ? IFPE.primary : "#64748b"}
+              />
+              <span
+                style={{
+                  ...styles.tipoBtnTexto,
+                  ...(tipo === "COLABORADOR" ? styles.tipoBtnTextoAtivo : {}),
+                }}
+              >
+                Colaborador
+              </span>
+              <span style={styles.tipoBtnSub}>Acesso operacional</span>
+            </button>
 
-          {/* Nome */}
+            <button
+              type="button"
+              style={{
+                ...styles.tipoBtn,
+                ...(tipo === "ADMINISTRADOR" ? styles.tipoBtnAtivo : {}),
+              }}
+              onClick={() => setTipo("ADMINISTRADOR")}
+            >
+              <IoShieldCheckmarkOutline
+                size={20}
+                color={tipo === "ADMINISTRADOR" ? IFPE.primary : "#64748b"}
+              />
+              <span
+                style={{
+                  ...styles.tipoBtnTexto,
+                  ...(tipo === "ADMINISTRADOR" ? styles.tipoBtnTextoAtivo : {}),
+                }}
+              >
+                Administrador
+              </span>
+              <span style={styles.tipoBtnSub}>Acesso total</span>
+            </button>
+          </div>
+
+          <h2 style={{ ...styles.sectionHeader, marginTop: 20 }}>
+            DADOS PESSOAIS
+          </h2>
+
           <label style={styles.label}>NOME COMPLETO *</label>
           <div
             style={{
@@ -180,7 +259,7 @@ export default function CadastroScreen() {
           >
             <IoPersonOutline
               size={18}
-              color={camposFocados.nome ? "#2563eb" : "#94a3b8"}
+              color={corFoco("nome")}
               style={styles.inputIcon}
             />
             <input
@@ -193,7 +272,6 @@ export default function CadastroScreen() {
             />
           </div>
 
-          {/* CPF */}
           <label style={styles.label}>CPF *</label>
           <div
             style={{
@@ -203,7 +281,7 @@ export default function CadastroScreen() {
           >
             <IoCardOutline
               size={18}
-              color={camposFocados.cpf ? "#2563eb" : "#94a3b8"}
+              color={corFoco("cpf")}
               style={styles.inputIcon}
             />
             <input
@@ -218,7 +296,6 @@ export default function CadastroScreen() {
             />
           </div>
 
-          {/* Telefone */}
           <label style={styles.label}>TELEFONE (WHATSAPP)</label>
           <div
             style={{
@@ -228,7 +305,7 @@ export default function CadastroScreen() {
           >
             <IoCallOutline
               size={18}
-              color={camposFocados.telefone ? "#2563eb" : "#94a3b8"}
+              color={corFoco("telefone")}
               style={styles.inputIcon}
             />
             <input
@@ -251,7 +328,6 @@ export default function CadastroScreen() {
             ACESSO AO SISTEMA
           </h2>
 
-          {/* E-mail */}
           <label style={styles.label}>E-MAIL *</label>
           <div
             style={{
@@ -261,7 +337,7 @@ export default function CadastroScreen() {
           >
             <IoMailOutline
               size={18}
-              color={camposFocados.email ? "#2563eb" : "#94a3b8"}
+              color={corFoco("email")}
               style={styles.inputIcon}
             />
             <input
@@ -276,7 +352,6 @@ export default function CadastroScreen() {
             />
           </div>
 
-          {/* Senha */}
           <label style={styles.label}>SENHA *</label>
           <div
             style={{
@@ -286,7 +361,7 @@ export default function CadastroScreen() {
           >
             <IoLockClosedOutline
               size={18}
-              color={camposFocados.senha ? "#2563eb" : "#94a3b8"}
+              color={corFoco("senha")}
               style={styles.inputIcon}
             />
             <input
@@ -311,7 +386,6 @@ export default function CadastroScreen() {
             </button>
           </div>
 
-          {/* Indicador de força de senha */}
           {senha.length > 0 && (
             <div style={styles.forcaContainer}>
               <div style={styles.barraFundo}>
@@ -329,7 +403,6 @@ export default function CadastroScreen() {
             </div>
           )}
 
-          {/* Botão de Cadastro */}
           <button
             type="button"
             style={{
@@ -368,7 +441,7 @@ export default function CadastroScreen() {
 const styles = {
   page: {
     minHeight: "100vh",
-    backgroundColor: "#0f172a",
+    backgroundColor: IFPE.pageBg,
     fontFamily: "sans-serif",
   },
   container: {
@@ -385,7 +458,7 @@ const styles = {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -393,9 +466,7 @@ const styles = {
     border: "none",
     cursor: "pointer",
   },
-  headerInfo: {
-    flex: 1,
-  },
+  headerInfo: { flex: 1 },
   headerTitle: {
     fontSize: 22,
     fontWeight: 800,
@@ -405,7 +476,7 @@ const styles = {
   },
   headerSubtitle: {
     fontSize: 13,
-    color: "#94a3b8",
+    color: "#bbf7d0",
     margin: "2px 0 0 0",
     fontWeight: 500,
   },
@@ -419,9 +490,43 @@ const styles = {
   sectionHeader: {
     fontSize: 12,
     fontWeight: 800,
-    color: "#2563eb",
+    color: IFPE.primary,
     letterSpacing: 0.8,
     margin: "0 0 8px 0",
+  },
+  tipoRow: {
+    display: "flex",
+    gap: 10,
+    marginBottom: 8,
+  },
+  tipoBtn: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+    padding: "14px 10px",
+    borderRadius: 14,
+    border: "1.5px solid #e2e8f0",
+    backgroundColor: "#f8fafc",
+    cursor: "pointer",
+  },
+  tipoBtnAtivo: {
+    borderColor: IFPE.primary,
+    backgroundColor: IFPE.primaryLight,
+  },
+  tipoBtnTexto: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#64748b",
+  },
+  tipoBtnTextoAtivo: {
+    color: IFPE.primaryText,
+  },
+  tipoBtnSub: {
+    fontSize: 10,
+    color: "#94a3b8",
+    fontWeight: 500,
   },
   label: {
     display: "block",
@@ -442,7 +547,7 @@ const styles = {
     height: 48,
   },
   inputWrapperFocado: {
-    borderColor: "#2563eb",
+    borderColor: IFPE.primary,
     backgroundColor: "#ffffff",
   },
   inputIcon: {
@@ -467,9 +572,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
   },
-  forcaContainer: {
-    marginTop: 8,
-  },
+  forcaContainer: { marginTop: 8 },
   barraFundo: {
     height: 4,
     backgroundColor: "#f1f5f9",
@@ -482,13 +585,10 @@ const styles = {
     borderRadius: 2,
     transition: "width 0.25s ease",
   },
-  forcaTexto: {
-    fontSize: 11.5,
-    fontWeight: 600,
-  },
+  forcaTexto: { fontSize: 11.5, fontWeight: 600 },
   button: {
     width: "100%",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     borderRadius: 14,
     height: 50,
     display: "flex",
@@ -497,7 +597,7 @@ const styles = {
     marginTop: 24,
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+    boxShadow: "0 4px 12px rgba(21, 128, 61, 0.3)",
   },
   buttonDisabled: {
     opacity: 0.65,
@@ -528,15 +628,12 @@ const styles = {
     marginTop: 18,
     gap: 4,
   },
-  linkText: {
-    fontSize: 14,
-    color: "#64748b",
-  },
+  linkText: { fontSize: 14, color: "#64748b" },
   linkDestaque: {
     background: "transparent",
     border: "none",
     fontSize: 14,
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 700,
     cursor: "pointer",
     padding: 0,

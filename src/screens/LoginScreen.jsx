@@ -11,6 +11,14 @@ import {
 import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
 
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  pageBg: "#14532d",
+  accent: "#4ade80",
+};
+
 export default function LoginScreen() {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -45,8 +53,16 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      await login(email, senha);
-      // O AuthContext + App.jsx redirecionam automaticamente
+      const usuarioLogado = await login(email.trim(), senha);
+
+      const isAdm = usuarioLogado?.role === "ROLE_ADM";
+      mostrarToast(
+        isAdm
+          ? "Bem-vindo, Administrador!"
+          : "Bem-vindo! Login realizado com sucesso.",
+        "sucesso"
+      );
+      // App.jsx redireciona pelas rotas conforme o role
     } catch (error) {
       let mensagem = "E-mail ou senha inválidos.";
 
@@ -79,27 +95,24 @@ export default function LoginScreen() {
       />
 
       <div style={styles.container}>
-        {/* Cabeçalho */}
         <div style={styles.header}>
           <div style={styles.iconCircleOuter}>
             <div style={styles.iconCircle}>
-              <IoCube size={36} color="#38bdf8" />
+              <IoCube size={36} color={IFPE.accent} />
             </div>
           </div>
           <h1 style={styles.appNome}>Gestão de Bens</h1>
           <p style={styles.appSubtitulo}>
-            Controle de Materiais & Patrimônios
+            IFPE • Controle de Materiais & Patrimônios
           </p>
         </div>
 
-        {/* Card do formulário */}
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>Bem-vindo de volta</h2>
           <p style={styles.cardSubtitle}>
             Entre com suas credenciais de acesso
           </p>
 
-          {/* E-mail */}
           <label style={styles.label}>E-MAIL CORPORATIVO</label>
           <div
             style={{
@@ -109,7 +122,7 @@ export default function LoginScreen() {
           >
             <IoMailOutline
               size={18}
-              color={focado.email ? "#2563eb" : "#94a3b8"}
+              color={focado.email ? IFPE.primary : "#94a3b8"}
               style={styles.inputIcon}
             />
             <input
@@ -125,7 +138,6 @@ export default function LoginScreen() {
             />
           </div>
 
-          {/* Senha */}
           <label style={styles.label}>SENHA</label>
           <div
             style={{
@@ -135,7 +147,7 @@ export default function LoginScreen() {
           >
             <IoLockClosedOutline
               size={18}
-              color={focado.senha ? "#2563eb" : "#94a3b8"}
+              color={focado.senha ? IFPE.primary : "#94a3b8"}
               style={styles.inputIcon}
             />
             <input
@@ -161,7 +173,6 @@ export default function LoginScreen() {
             </button>
           </div>
 
-          {/* Botão com shake */}
           <div
             style={{
               marginTop: 24,
@@ -188,14 +199,12 @@ export default function LoginScreen() {
             </button>
           </div>
 
-          {/* Divisor */}
           <div style={styles.divider}>
             <div style={styles.dividerLine} />
             <span style={styles.dividerText}>Novo por aqui?</span>
             <div style={styles.dividerLine} />
           </div>
 
-          {/* Link cadastro */}
           <div style={styles.linkContainer}>
             <span style={styles.linkText}>Não possui conta? </span>
             <button
@@ -208,7 +217,7 @@ export default function LoginScreen() {
           </div>
         </div>
 
-        <p style={styles.footerText}>IF Escritório • v2.0</p>
+        <p style={styles.footerText}>IF Escritório • IFPE • v2.0</p>
       </div>
     </div>
   );
@@ -217,7 +226,7 @@ export default function LoginScreen() {
 const styles = {
   page: {
     minHeight: "100vh",
-    backgroundColor: "#0f172a",
+    backgroundColor: IFPE.pageBg,
     fontFamily: "sans-serif",
   },
   container: {
@@ -225,7 +234,6 @@ const styles = {
     margin: "0 auto",
     padding: "36px 0",
   },
-
   header: {
     display: "flex",
     flexDirection: "column",
@@ -236,22 +244,22 @@ const styles = {
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    backgroundColor: "rgba(74, 222, 128, 0.15)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 14,
-    border: "1px solid rgba(56, 189, 248, 0.25)",
+    border: "1px solid rgba(74, 222, 128, 0.3)",
   },
   iconCircle: {
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: "#1e293b",
+    backgroundColor: "#166534",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
   },
   appNome: {
     fontSize: 24,
@@ -262,11 +270,10 @@ const styles = {
   },
   appSubtitulo: {
     fontSize: 13,
-    color: "#94a3b8",
+    color: "#bbf7d0",
     margin: "4px 0 0 0",
     fontWeight: 500,
   },
-
   card: {
     backgroundColor: "#ffffff",
     margin: "0 18px",
@@ -285,7 +292,6 @@ const styles = {
     color: "#64748b",
     margin: "0 0 20px 0",
   },
-
   label: {
     display: "block",
     fontSize: 11,
@@ -305,7 +311,7 @@ const styles = {
     height: 50,
   },
   inputWrapperFocado: {
-    borderColor: "#2563eb",
+    borderColor: IFPE.primary,
     backgroundColor: "#ffffff",
   },
   inputIcon: {
@@ -330,10 +336,9 @@ const styles = {
     display: "flex",
     alignItems: "center",
   },
-
   button: {
     width: "100%",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     borderRadius: 14,
     height: 50,
     display: "flex",
@@ -341,7 +346,7 @@ const styles = {
     alignItems: "center",
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+    boxShadow: "0 4px 12px rgba(21, 128, 61, 0.35)",
   },
   buttonDisabled: {
     opacity: 0.65,
@@ -365,7 +370,6 @@ const styles = {
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
   },
-
   divider: {
     display: "flex",
     alignItems: "center",
@@ -382,7 +386,6 @@ const styles = {
     color: "#94a3b8",
     fontWeight: 500,
   },
-
   linkContainer: {
     display: "flex",
     justifyContent: "center",
@@ -397,15 +400,14 @@ const styles = {
     background: "transparent",
     border: "none",
     fontSize: 14,
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 700,
     cursor: "pointer",
     padding: 0,
   },
-
   footerText: {
     textAlign: "center",
-    color: "#475569",
+    color: "#86efac",
     fontSize: 11,
     fontWeight: 500,
     marginTop: 20,
