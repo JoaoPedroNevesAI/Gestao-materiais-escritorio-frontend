@@ -30,6 +30,7 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [carregandoPerfil, setCarregandoPerfil] = useState(false);
   const [camposFocados, setCamposFocados] = useState({});
   const [toast, setToast] = useState({
     visivel: false,
@@ -38,6 +39,13 @@ export default function ProfileScreen() {
   });
 
   const isAdm = usuario?.role === "ROLE_ADM";
+
+  const idUsuario =
+    usuario?.id ||
+    usuario?.usuarioId ||
+    usuario?.idUsuario ||
+    usuario?.userId ||
+    null;
 
   const mostrarToast = (mensagem, tipo = "erro") =>
     setToast({ visivel: true, tipo, mensagem });
@@ -51,14 +59,51 @@ export default function ProfileScreen() {
       .slice(0, 15);
   };
 
-  // Carrega dados do contexto (telefone pode vir como telefone ou celular)
+  // Preenche com o que já está no contexto
   useEffect(() => {
     if (!usuario) return;
     setNome(usuario.nome || "");
     setEmail(usuario.email || "");
-    const telRaw = usuario.telefone ?? usuario.celular ?? "";
-    setTelefone(mascaraTelefone(telRaw));
+    setTelefone(mascaraTelefone(usuario.telefone ?? usuario.celular ?? ""));
   }, [usuario]);
+
+  // Busca dados atualizados na API (telefone fresco do banco)
+  useEffect(() => {
+    if (!idUsuario) return;
+
+    let cancelado = false;
+
+    (async () => {
+      setCarregandoPerfil(true);
+      try {
+        const { data } = await api.get(`/usuario/${idUsuario}`);
+        if (cancelado || !data) return;
+
+        const tel = data.telefone ?? data.celular ?? "";
+        setNome(data.nome || "");
+        setEmail(data.email || "");
+        setTelefone(mascaraTelefone(tel));
+
+        if (updateUsuario) {
+          await updateUsuario({
+            ...usuario,
+            ...data,
+            id: idUsuario,
+            telefone: tel || null,
+          });
+        }
+      } catch {
+        // Mantém o que veio do contexto / login
+      } finally {
+        if (!cancelado) setCarregandoPerfil(false);
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idUsuario]);
 
   const validar = () => {
     if (!nome.trim() || !email.trim()) {
@@ -85,13 +130,6 @@ export default function ProfileScreen() {
   };
 
   const handleSalvar = async () => {
-    const idUsuario =
-      usuario?.id ||
-      usuario?.usuarioId ||
-      usuario?.idUsuario ||
-      usuario?.userId ||
-      null;
-
     if (!idUsuario) {
       mostrarToast("Não foi possível identificar o usuário.", "erro");
       return;
@@ -111,32 +149,38 @@ export default function ProfileScreen() {
     try {
       const response = await api.put(`/usuario/${idUsuario}`, payload);
 
-      // Garante que o telefone não some se o back não devolver o campo
-      const dadosBack = response?.data && typeof response.data === "object"
-        ? response.data
-        : {};
+      const dadosBack =
+        response?.data && typeof response.data === "object"
+          ? response.data
+          : {};
 
       const usuarioAtualizado = {
         ...usuario,
         ...dadosBack,
-        ...payload, // payload ganha: telefone/nome/email que acabamos de salvar
+        ...payload,
+        id: idUsuario,
         telefone:
-          dadosBack.telefone ??
-          dadosBack.celular ??
-          payload.telefone,
+          dadosBack.telefone ?? dadosBack.celular ?? payload.telefone,
       };
 
       if (updateUsuario) {
         await updateUsuario(usuarioAtualizado);
       }
 
-      // Mantém máscara na tela
+      setNome(usuarioAtualizado.nome || payload.nome);
+      setEmail(usuarioAtualizado.email || payload.email);
       setTelefone(mascaraTelefone(usuarioAtualizado.telefone || ""));
 
       mostrarToast("Perfil atualizado com sucesso!", "sucesso");
     } catch (error) {
-      const msg =
+      const status = error.response?.status;
+      let msg =
         error.response?.data?.message || "Não foi possível atualizar o perfil.";
+      if (status === 403) {
+        msg = "Sem permissão para atualizar este perfil.";
+      } else if (status === 401) {
+        msg = "Sessão expirada. Faça login novamente.";
+      }
       mostrarToast(msg, "erro");
     } finally {
       setLoading(false);
@@ -193,28 +237,26 @@ export default function ProfileScreen() {
           <div style={styles.avatarRing}>
             <div style={styles.avatar}>
               <span style={styles.avatarText}>
-                {usuario?.nome?.charAt(0).toUpperCase() ?? "U"}
+                {nome?.charAt(0).toUpperCase() ||
+                  usuario?.nome?.charAt(0).toUpperCase() ||
+                  "U"}
               </span>
             </div>
           </div>
 
-          <h1 style={styles.heroNome}>{usuario?.nome || "Usuário"}</h1>
+          <h1 style={styles.heroNome}>{nome || usuario?.nome || "Usuário"}</h1>
           <p style={styles.heroEmail}>
-            {usuario?.email || "sem e-mail cadastrado"}
+            {email || usuario?.email || "sem e-mail cadastrado"}
           </p>
 
-          {/* Telefone visível no card */}
           <div style={styles.heroTelefone}>
             <IoCallOutline size={14} color={IFPE.primary} />
-            <span>{telefoneExibicao}</span>
+            <span>
+              {carregandoPerfil ? "Carregando..." : telefoneExibicao}
+            </span>
           </div>
 
-          <div
-            style={{
-              ...styles.badgeRole,
-              ...(isAdm ? styles.badgeAdm : styles.badgeColab),
-            }}
-          >
+          <div style={styles.badgeRole}>
             {isAdm ? (
               <IoShieldCheckmark size={13} color={IFPE.primaryText} />
             ) : (
@@ -348,8 +390,7 @@ export default function ProfileScreen() {
         </div>
 
         <p style={styles.footerVersion}>
-          IF Escritório • IFPE •{" "}
-          {isAdm ? "Administrador" : "Colaborador"}
+          IF Escritório • IFPE • {isAdm ? "Administrador" : "Colaborador"}
         </p>
       </div>
     </div>
@@ -434,8 +475,6 @@ const styles = {
     borderRadius: 20,
     backgroundColor: IFPE.primaryLight,
   },
-  badgeAdm: {},
-  badgeColab: {},
   badgeRoleText: {
     fontSize: 11.5,
     fontWeight: 700,

@@ -10,8 +10,6 @@ import {
   IoEyeOutline,
   IoEyeOffOutline,
   IoCheckmarkCircleOutline,
-  IoShieldCheckmarkOutline,
-  IoPeopleOutline,
 } from "react-icons/io5";
 import api from "../services/api";
 import Toast from "../components/Toast";
@@ -34,8 +32,6 @@ export default function CadastroScreen() {
   const [senha, setSenha] = useState("");
   const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [telefone, setTelefone] = useState("");
-  // Perfil: COLABORADOR | ADMINISTRADOR (ajuste se o back usar ROLE_ADM etc.)
-  const [tipo, setTipo] = useState("COLABORADOR");
   const [loading, setLoading] = useState(false);
   const [camposFocados, setCamposFocados] = useState({});
   const [toast, setToast] = useState({
@@ -47,22 +43,20 @@ export default function CadastroScreen() {
   const mostrarToast = (mensagem, tipoToast = "erro") =>
     setToast({ visivel: true, tipo: tipoToast, mensagem });
 
-  const mascaraCPF = (valor) => {
-    return valor
+  const mascaraCPF = (valor) =>
+    valor
       .replace(/\D/g, "")
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d{1,2})$/, "$1-$2")
       .slice(0, 14);
-  };
 
-  const mascaraTelefone = (valor) => {
-    return valor
+  const mascaraTelefone = (valor) =>
+    valor
       .replace(/\D/g, "")
       .replace(/(\d{2})(\d)/, "($1) $2")
       .replace(/(\d{5})(\d{1,4})$/, "$1-$2")
       .slice(0, 15);
-  };
 
   const validar = () => {
     if (!nome.trim() || !cpf || !email || !senha) {
@@ -73,13 +67,11 @@ export default function CadastroScreen() {
       mostrarToast("O nome deve ter pelo menos 3 caracteres.", "aviso");
       return false;
     }
-    const cpfLimpo = cpf.replace(/\D/g, "");
-    if (cpfLimpo.length !== 11) {
+    if (cpf.replace(/\D/g, "").length !== 11) {
       mostrarToast("CPF inválido. Digite os 11 dígitos.", "aviso");
       return false;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       mostrarToast("Digite um e-mail corporativo válido.", "aviso");
       return false;
     }
@@ -96,8 +88,8 @@ export default function CadastroScreen() {
       return false;
     }
     if (telefone) {
-      const telLimpo = telefone.replace(/\D/g, "");
-      if (telLimpo.length < 10 || telLimpo.length > 11) {
+      const tel = telefone.replace(/\D/g, "");
+      if (tel.length < 10 || tel.length > 11) {
         mostrarToast("Telefone inválido. Digite DDD + número.", "aviso");
         return false;
       }
@@ -109,33 +101,32 @@ export default function CadastroScreen() {
     if (!validar()) return;
     setLoading(true);
     try {
-      // Se o back esperar "ROLE_ADM" / "ROLE_COLABORADOR", troque o map abaixo
-      const tipoPayload =
-        tipo === "ADMINISTRADOR" ? "ADMINISTRADOR" : "COLABORADOR";
-      // Alternativa comum no Spring:
-      // const tipoPayload = tipo === "ADMINISTRADOR" ? "ROLE_ADM" : "ROLE_COLABORADOR";
-
+      // Cadastro público: apenas colaborador (ADM só no backend)
       await api.post("/usuario", {
         nome: nome.trim(),
         cpf: cpf.replace(/\D/g, ""),
         email: email.trim(),
         senha,
         telefone: telefone.replace(/\D/g, "") || null,
-        tipo: tipoPayload,
+        tipo: "COLABORADOR",
       });
 
-      mostrarToast(
-        tipo === "ADMINISTRADOR"
-          ? "Conta de administrador criada! Faça login."
-          : "Conta de colaborador criada! Faça login.",
-        "sucesso"
-      );
+      mostrarToast("Conta criada com sucesso! Faça login.", "sucesso");
       setTimeout(() => navigate("/login"), 1500);
     } catch (error) {
       console.error(error);
-      const msg =
+      const status = error.response?.status;
+      let msg =
         error.response?.data?.message ||
         "Não foi possível criar a conta. Verifique os dados.";
+
+      if (status === 403) {
+        msg =
+          "Cadastro não autorizado pelo servidor. Confirme se o registro público de colaborador está liberado.";
+      } else if (status === 409) {
+        msg = "E-mail ou CPF já cadastrado.";
+      }
+
       mostrarToast(msg, "erro");
     } finally {
       setLoading(false);
@@ -143,20 +134,18 @@ export default function CadastroScreen() {
   };
 
   const forcaSenha = () => {
-    if (!senha) return { nivel: 0, label: "", cor: "#e2e8f0", barra: "0%" };
+    if (!senha) return { label: "", cor: "#e2e8f0", barra: "0%" };
     if (senha.length >= 6 && /[A-Z]/.test(senha) && /[0-9]/.test(senha)) {
-      return { nivel: 3, label: "✓ Senha forte", cor: "#10b981", barra: "100%" };
+      return { label: "✓ Senha forte", cor: "#10b981", barra: "100%" };
     }
     if (senha.length >= 6) {
       return {
-        nivel: 2,
         label: "⚠ Adicione maiúscula e número",
         cor: "#f59e0b",
         barra: "60%",
       };
     }
     return {
-      nivel: 1,
       label: "✗ Mínimo 6 caracteres",
       cor: "#ef4444",
       barra: "30%",
@@ -164,8 +153,7 @@ export default function CadastroScreen() {
   };
 
   const infoForca = forcaSenha();
-  const corFoco = (campo) =>
-    camposFocados[campo] ? IFPE.primary : "#94a3b8";
+  const corFoco = (campo) => (camposFocados[campo] ? IFPE.primary : "#94a3b8");
 
   return (
     <div style={styles.page}>
@@ -187,68 +175,17 @@ export default function CadastroScreen() {
           </button>
           <div style={styles.headerInfo}>
             <h1 style={styles.headerTitle}>Criar Conta</h1>
-            <p style={styles.headerSubtitle}>
-              {tipo === "ADMINISTRADOR"
-                ? "Cadastro de administrador"
-                : "Cadastro de colaborador"}
-            </p>
+            <p style={styles.headerSubtitle}>Cadastro de colaborador · IFPE</p>
           </div>
         </div>
 
         <div style={styles.card}>
-          {/* ===== TIPO DE CONTA ===== */}
-          <h2 style={styles.sectionHeader}>TIPO DE CONTA *</h2>
-          <div style={styles.tipoRow}>
-            <button
-              type="button"
-              style={{
-                ...styles.tipoBtn,
-                ...(tipo === "COLABORADOR" ? styles.tipoBtnAtivo : {}),
-              }}
-              onClick={() => setTipo("COLABORADOR")}
-            >
-              <IoPeopleOutline
-                size={20}
-                color={tipo === "COLABORADOR" ? IFPE.primary : "#64748b"}
-              />
-              <span
-                style={{
-                  ...styles.tipoBtnTexto,
-                  ...(tipo === "COLABORADOR" ? styles.tipoBtnTextoAtivo : {}),
-                }}
-              >
-                Colaborador
-              </span>
-              <span style={styles.tipoBtnSub}>Acesso operacional</span>
-            </button>
-
-            <button
-              type="button"
-              style={{
-                ...styles.tipoBtn,
-                ...(tipo === "ADMINISTRADOR" ? styles.tipoBtnAtivo : {}),
-              }}
-              onClick={() => setTipo("ADMINISTRADOR")}
-            >
-              <IoShieldCheckmarkOutline
-                size={20}
-                color={tipo === "ADMINISTRADOR" ? IFPE.primary : "#64748b"}
-              />
-              <span
-                style={{
-                  ...styles.tipoBtnTexto,
-                  ...(tipo === "ADMINISTRADOR" ? styles.tipoBtnTextoAtivo : {}),
-                }}
-              >
-                Administrador
-              </span>
-              <span style={styles.tipoBtnSub}>Acesso total</span>
-            </button>
+          <div style={styles.infoBox}>
+            Contas de <strong>administrador</strong> são criadas apenas pela
+            equipe técnica. Este formulário registra colaboradores.
           </div>
 
-          <h2 style={{ ...styles.sectionHeader, marginTop: 20 }}>
-            DADOS PESSOAIS
-          </h2>
+          <h2 style={styles.sectionHeader}>DADOS PESSOAIS</h2>
 
           <label style={styles.label}>NOME COMPLETO *</label>
           <div
@@ -487,46 +424,22 @@ const styles = {
     padding: 22,
     boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
   },
+  infoBox: {
+    fontSize: 12.5,
+    color: IFPE.primaryText,
+    backgroundColor: IFPE.primaryLight,
+    border: `1px solid ${IFPE.primaryBorder}`,
+    borderRadius: 12,
+    padding: "10px 12px",
+    marginBottom: 16,
+    lineHeight: 1.4,
+  },
   sectionHeader: {
     fontSize: 12,
     fontWeight: 800,
     color: IFPE.primary,
     letterSpacing: 0.8,
     margin: "0 0 8px 0",
-  },
-  tipoRow: {
-    display: "flex",
-    gap: 10,
-    marginBottom: 8,
-  },
-  tipoBtn: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 4,
-    padding: "14px 10px",
-    borderRadius: 14,
-    border: "1.5px solid #e2e8f0",
-    backgroundColor: "#f8fafc",
-    cursor: "pointer",
-  },
-  tipoBtnAtivo: {
-    borderColor: IFPE.primary,
-    backgroundColor: IFPE.primaryLight,
-  },
-  tipoBtnTexto: {
-    fontSize: 13,
-    fontWeight: 700,
-    color: "#64748b",
-  },
-  tipoBtnTextoAtivo: {
-    color: IFPE.primaryText,
-  },
-  tipoBtnSub: {
-    fontSize: 10,
-    color: "#94a3b8",
-    fontWeight: 500,
   },
   label: {
     display: "block",

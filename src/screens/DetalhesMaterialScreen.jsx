@@ -24,6 +24,14 @@ import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
 
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+};
+
 export default function DetalhesMaterialScreen() {
   const navigate = useNavigate();
   const { materialId: paramId } = useParams();
@@ -36,7 +44,9 @@ export default function DetalhesMaterialScreen() {
   const [historico, setHistorico] = useState([]);
   const [historicoManutencoes, setHistoricoManutencoes] = useState([]);
   const [abaHistorico, setAbaHistorico] = useState("movimentacoes");
-  const [loadingMaterial, setLoadingMaterial] = useState(!materialParam && !!materialId);
+  const [loadingMaterial, setLoadingMaterial] = useState(
+    !materialParam && !!materialId
+  );
   const [loadingHistorico, setLoadingHistorico] = useState(true);
   const [patrimoniosSelecionados, setPatrimoniosSelecionados] = useState([]);
   const [modalQrCode, setModalQrCode] = useState({
@@ -178,30 +188,80 @@ export default function DetalhesMaterialScreen() {
   const obterStatusPatrimonioBadge = (status) => {
     switch (status) {
       case "DISPONIVEL":
-        return { rotulo: "Disponível", bg: "#ecfdf5", cor: "#059669", borda: "#a7f3d0" };
+        return {
+          rotulo: "Disponível",
+          bg: "#ecfdf5",
+          cor: "#059669",
+          borda: "#a7f3d0",
+        };
       case "EM_USO":
-        return { rotulo: "Em Uso", bg: "#eff6ff", cor: "#2563eb", borda: "#bfdbfe" };
+        return {
+          rotulo: "Em Uso",
+          bg: IFPE.primaryLight,
+          cor: IFPE.primary,
+          borda: IFPE.primaryBorder,
+        };
       case "EM_MANUTENCAO":
-        return { rotulo: "Manutenção", bg: "#fffbeb", cor: "#d97706", borda: "#fde68a" };
+        return {
+          rotulo: "Manutenção",
+          bg: "#fffbeb",
+          cor: "#d97706",
+          borda: "#fde68a",
+        };
       case "BAIXADO":
-        return { rotulo: "Baixado", bg: "#fef2f2", cor: "#dc2626", borda: "#fecaca" };
+        return {
+          rotulo: "Baixado",
+          bg: "#fef2f2",
+          cor: "#dc2626",
+          borda: "#fecaca",
+        };
       default:
-        return { rotulo: status || "Ativo", bg: "#f1f5f9", cor: "#475569", borda: "#cbd5e1" };
+        return {
+          rotulo: status || "Ativo",
+          bg: "#f1f5f9",
+          cor: "#475569",
+          borda: "#cbd5e1",
+        };
     }
   };
 
   const obterStatusManutencaoBadge = (status) => {
     switch (status) {
       case "PENDENTE":
-        return { rotulo: "Pendente", bg: "#fffbeb", cor: "#d97706", borda: "#fde68a" };
+        return {
+          rotulo: "Pendente",
+          bg: "#fffbeb",
+          cor: "#d97706",
+          borda: "#fde68a",
+        };
       case "APROVADA":
-        return { rotulo: "Aprovada", bg: "#ecfdf5", cor: "#059669", borda: "#a7f3d0" };
+        return {
+          rotulo: "Aprovada",
+          bg: "#ecfdf5",
+          cor: "#059669",
+          borda: "#a7f3d0",
+        };
       case "REPROVADA":
-        return { rotulo: "Reprovada", bg: "#fef2f2", cor: "#dc2626", borda: "#fecaca" };
+        return {
+          rotulo: "Reprovada",
+          bg: "#fef2f2",
+          cor: "#dc2626",
+          borda: "#fecaca",
+        };
       case "CONCLUIDA":
-        return { rotulo: "Concluída", bg: "#eff6ff", cor: "#2563eb", borda: "#bfdbfe" };
+        return {
+          rotulo: "Concluída",
+          bg: IFPE.primaryLight,
+          cor: IFPE.primary,
+          borda: IFPE.primaryBorder,
+        };
       default:
-        return { rotulo: status || "Status", bg: "#f1f5f9", cor: "#475569", borda: "#cbd5e1" };
+        return {
+          rotulo: status || "Status",
+          bg: "#f1f5f9",
+          cor: "#475569",
+          borda: "#cbd5e1",
+        };
     }
   };
 
@@ -224,7 +284,11 @@ export default function DetalhesMaterialScreen() {
     return (
       <div style={styles.centerContainer}>
         <p style={styles.erroTitulo}>Material não encontrado.</p>
-        <button style={styles.btnVoltar} onClick={() => navigate(-1)}>
+        <button
+          type="button"
+          style={styles.btnVoltar}
+          onClick={() => navigate(-1)}
+        >
           Voltar
         </button>
       </div>
@@ -232,9 +296,13 @@ export default function DetalhesMaterialScreen() {
   }
 
   const patrimonios = materialAtual.patrimonios || [];
-  const totalDisponiveis = patrimonios.filter((p) => p.status === "DISPONIVEL").length;
+  const totalDisponiveis = patrimonios.filter(
+    (p) => p.status === "DISPONIVEL"
+  ).length;
   const totalEmUso = patrimonios.filter((p) => p.status === "EM_USO").length;
-  const totalManutencao = patrimonios.filter((p) => p.status === "EM_MANUTENCAO").length;
+  const totalManutencao = patrimonios.filter(
+    (p) => p.status === "EM_MANUTENCAO"
+  ).length;
 
   return (
     <div style={styles.container}>
@@ -246,10 +314,13 @@ export default function DetalhesMaterialScreen() {
       />
 
       <div style={styles.content}>
-        {/* Hero Image */}
         <div style={styles.heroContainer}>
           {uriImagem ? (
-            <img src={uriImagem} alt={materialAtual.nome} style={styles.heroImagem} />
+            <img
+              src={uriImagem}
+              alt={materialAtual.nome}
+              style={styles.heroImagem}
+            />
           ) : (
             <div style={styles.heroPlaceholder}>
               <IoCubeOutline size={64} color="#cbd5e1" />
@@ -258,12 +329,11 @@ export default function DetalhesMaterialScreen() {
           )}
         </div>
 
-        {/* Card Principal */}
         <div style={styles.mainInfoCard}>
           <div style={styles.pillRow}>
             {materialAtual.categoria?.nome && (
               <div style={styles.categoriaPill}>
-                <IoPricetag size={11} color="#2563eb" />
+                <IoPricetag size={11} color={IFPE.primary} />
                 <span style={styles.categoriaPillTexto}>
                   {materialAtual.categoria.nome}
                 </span>
@@ -272,7 +342,9 @@ export default function DetalhesMaterialScreen() {
             {materialAtual.local?.nome && (
               <div style={styles.localPill}>
                 <IoLocation size={11} color="#475569" />
-                <span style={styles.localPillTexto}>{materialAtual.local.nome}</span>
+                <span style={styles.localPillTexto}>
+                  {materialAtual.local.nome}
+                </span>
               </div>
             )}
           </div>
@@ -287,7 +359,6 @@ export default function DetalhesMaterialScreen() {
             <p style={styles.precoTexto}>{formatarValor(materialAtual.valor)}</p>
           )}
 
-          {/* Métricas */}
           <div style={styles.metricasGrid}>
             <div style={styles.metricaBox}>
               <span style={styles.metricaNumero}>{materialAtual.quantidade}</span>
@@ -308,11 +379,11 @@ export default function DetalhesMaterialScreen() {
             <div
               style={{
                 ...styles.metricaBox,
-                borderColor: "#bfdbfe",
-                backgroundColor: "#eff6ff",
+                borderColor: IFPE.primaryBorder,
+                backgroundColor: IFPE.primaryLight,
               }}
             >
-              <span style={{ ...styles.metricaNumero, color: "#2563eb" }}>
+              <span style={{ ...styles.metricaNumero, color: IFPE.primary }}>
                 {totalEmUso}
               </span>
               <span style={styles.metricaRotulo}>Em Uso</span>
@@ -334,7 +405,6 @@ export default function DetalhesMaterialScreen() {
           </div>
         </div>
 
-        {/* Lista de Patrimônios */}
         {patrimonios.length > 0 && (
           <div style={styles.secaoPatrimonios}>
             <div style={styles.secaoHeader}>
@@ -349,7 +419,9 @@ export default function DetalhesMaterialScreen() {
             </div>
 
             {patrimonios.map((pat) => {
-              const isSelected = patrimoniosSelecionados.some((p) => p.id === pat.id);
+              const isSelected = patrimoniosSelecionados.some(
+                (p) => p.id === pat.id
+              );
               const statusBadge = obterStatusPatrimonioBadge(pat.status);
 
               return (
@@ -366,7 +438,7 @@ export default function DetalhesMaterialScreen() {
                   >
                     <div style={styles.patrimonioLeft}>
                       {isSelected ? (
-                        <IoCheckbox size={22} color="#2563eb" />
+                        <IoCheckbox size={22} color={IFPE.primary} />
                       ) : (
                         <IoSquareOutline size={22} color="#94a3b8" />
                       )}
@@ -400,7 +472,6 @@ export default function DetalhesMaterialScreen() {
                     </div>
                   </div>
 
-                  {/* Ações */}
                   <div style={styles.patrimonioAcoesRow}>
                     <button
                       type="button"
@@ -411,13 +482,16 @@ export default function DetalhesMaterialScreen() {
                         })
                       }
                     >
-                      <IoSwapHorizontal size={14} color="#2563eb" />
+                      <IoSwapHorizontal size={14} color={IFPE.primary} />
                       <span style={styles.btnAcaoPillTexto}>Transferir</span>
                     </button>
 
                     <button
                       type="button"
-                      style={{ ...styles.btnAcaoPill, ...styles.btnAcaoManutencao }}
+                      style={{
+                        ...styles.btnAcaoPill,
+                        ...styles.btnAcaoManutencao,
+                      }}
                       onClick={() =>
                         navigate("/materiais/manutencao", {
                           state: { material: materialAtual, patrimonio: pat },
@@ -425,7 +499,12 @@ export default function DetalhesMaterialScreen() {
                       }
                     >
                       <IoConstruct size={13} color="#d97706" />
-                      <span style={{ ...styles.btnAcaoPillTexto, color: "#d97706" }}>
+                      <span
+                        style={{
+                          ...styles.btnAcaoPillTexto,
+                          color: "#d97706",
+                        }}
+                      >
                         Manutenção
                       </span>
                     </button>
@@ -436,7 +515,7 @@ export default function DetalhesMaterialScreen() {
                       onClick={() => abrirModalQrCode(pat)}
                       title="Ver QR Code"
                     >
-                      <IoQrCodeOutline size={15} color="#2563eb" />
+                      <IoQrCodeOutline size={15} color={IFPE.primary} />
                     </button>
                   </div>
                 </div>
@@ -445,7 +524,6 @@ export default function DetalhesMaterialScreen() {
           </div>
         )}
 
-        {/* Ações ADM */}
         {usuario?.role === "ROLE_ADM" && (
           <div style={styles.adminAcoesContainer}>
             <button
@@ -457,7 +535,7 @@ export default function DetalhesMaterialScreen() {
                 })
               }
             >
-              <IoCreateOutline size={18} color="#2563eb" />
+              <IoCreateOutline size={18} color={IFPE.primary} />
               <span style={styles.btnEditarMaterialTexto}>Editar Material</span>
             </button>
             <button
@@ -471,7 +549,6 @@ export default function DetalhesMaterialScreen() {
           </div>
         )}
 
-        {/* Abas de Histórico */}
         <div style={styles.historicoTabsContainer}>
           <button
             type="button"
@@ -485,7 +562,9 @@ export default function DetalhesMaterialScreen() {
           >
             <IoSwapHorizontalOutline
               size={15}
-              color={abaHistorico === "movimentacoes" ? "#2563eb" : "#64748b"}
+              color={
+                abaHistorico === "movimentacoes" ? IFPE.primary : "#64748b"
+              }
             />
             <span
               style={{
@@ -511,7 +590,9 @@ export default function DetalhesMaterialScreen() {
           >
             <IoConstructOutline
               size={15}
-              color={abaHistorico === "manutencoes" ? "#2563eb" : "#64748b"}
+              color={
+                abaHistorico === "manutencoes" ? IFPE.primary : "#64748b"
+              }
             />
             <span
               style={{
@@ -526,9 +607,10 @@ export default function DetalhesMaterialScreen() {
           </button>
         </div>
 
-        {/* Conteúdo Histórico */}
         {loadingHistorico ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
+          <div
+            style={{ display: "flex", justifyContent: "center", padding: 24 }}
+          >
             <div style={styles.spinner} />
           </div>
         ) : abaHistorico === "movimentacoes" ? (
@@ -543,8 +625,10 @@ export default function DetalhesMaterialScreen() {
             historico.map((item) => (
               <div key={item.id} style={styles.historicoCard}>
                 <div style={styles.historicoHeader}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <IoBarcodeOutline size={14} color="#2563eb" />
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 5 }}
+                  >
+                    <IoBarcodeOutline size={14} color={IFPE.primary} />
                     <span style={styles.historicoCodigo}>
                       {item.patrimonio?.codigoPatrimonio || "Geral"}
                     </span>
@@ -561,7 +645,7 @@ export default function DetalhesMaterialScreen() {
                       {item.localOrigem?.nome || "—"}
                     </span>
                   </div>
-                  <IoArrowForward size={16} color="#2563eb" />
+                  <IoArrowForward size={16} color={IFPE.primary} />
                   <div style={styles.rotaLocal}>
                     <span style={styles.rotaLabel}>DESTINO</span>
                     <span style={styles.rotaNome}>
@@ -596,7 +680,9 @@ export default function DetalhesMaterialScreen() {
             return (
               <div key={item.id} style={styles.historicoCard}>
                 <div style={styles.historicoHeader}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 5 }}
+                  >
                     <IoConstructOutline size={14} color="#d97706" />
                     <span style={styles.historicoCodigo}>
                       {item.patrimonio?.codigoPatrimonio ||
@@ -651,7 +737,6 @@ export default function DetalhesMaterialScreen() {
         )}
       </div>
 
-      {/* Barra de lote flutuante */}
       {patrimoniosSelecionados.length > 0 && (
         <div style={styles.barraLoteFlutuante}>
           <button
@@ -674,13 +759,12 @@ export default function DetalhesMaterialScreen() {
         </div>
       )}
 
-      {/* Modal QR Code */}
       {modalQrCode.visivel && (
         <div style={styles.modalQrOverlay}>
           <div style={styles.modalQrCard}>
             <div style={styles.modalQrHeader}>
               <div style={styles.modalQrIconBox}>
-                <IoQrCode size={20} color="#2563eb" />
+                <IoQrCode size={20} color={IFPE.primary} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={styles.modalQrTitulo}>Etiqueta de Patrimônio</div>
@@ -742,7 +826,7 @@ export default function DetalhesMaterialScreen() {
                       <div style={styles.spinnerSmall} />
                     ) : (
                       <>
-                        <IoRefresh size={16} color="#2563eb" />
+                        <IoRefresh size={16} color={IFPE.primary} />
                         <span style={styles.btnRegenerarModalTexto}>
                           Regenerar Imagem no Servidor
                         </span>
@@ -766,7 +850,6 @@ export default function DetalhesMaterialScreen() {
         </div>
       )}
 
-      {/* Modal Excluir */}
       {modalExcluir && (
         <div style={styles.modalQrOverlay}>
           <div style={{ ...styles.modalQrCard, maxWidth: 360 }}>
@@ -818,7 +901,6 @@ export default function DetalhesMaterialScreen() {
   );
 }
 
-// ====================== ESTILOS ======================
 const styles = {
   container: {
     minHeight: "100%",
@@ -836,7 +918,7 @@ const styles = {
   },
   erroTitulo: { fontSize: 16, fontWeight: 600, color: "#0f172a" },
   btnVoltar: {
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     padding: "10px 20px",
     borderRadius: 10,
     border: "none",
@@ -888,11 +970,15 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "5px 10px",
     borderRadius: 14,
   },
-  categoriaPillTexto: { fontSize: 11, fontWeight: 700, color: "#2563eb" },
+  categoriaPillTexto: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: IFPE.primary,
+  },
   localPill: {
     display: "flex",
     alignItems: "center",
@@ -937,7 +1023,12 @@ const styles = {
     textAlign: "center",
     border: "1px solid #e2e8f0",
   },
-  metricaNumero: { fontSize: 17, fontWeight: 800, color: "#0f172a", display: "block" },
+  metricaNumero: {
+    fontSize: 17,
+    fontWeight: 800,
+    color: "#0f172a",
+    display: "block",
+  },
   metricaRotulo: {
     fontSize: 11,
     color: "#64748b",
@@ -946,7 +1037,12 @@ const styles = {
     display: "block",
   },
 
-  secaoPatrimonios: { margin: "20px 16px 0", display: "flex", flexDirection: "column", gap: 10 },
+  secaoPatrimonios: {
+    margin: "20px 16px 0",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
   secaoHeader: { marginBottom: 4 },
   secaoTitulo: {
     fontSize: 14,
@@ -969,8 +1065,8 @@ const styles = {
     gap: 12,
   },
   patrimonioCardSelecionado: {
-    borderColor: "#2563eb",
-    backgroundColor: "#f8faff",
+    borderColor: IFPE.primary,
+    backgroundColor: IFPE.primaryLight,
   },
   patrimonioCardTop: {
     display: "flex",
@@ -1001,13 +1097,17 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "6px 12px",
     borderRadius: 20,
-    border: "1px solid #bfdbfe",
+    border: `1px solid ${IFPE.primaryBorder}`,
     cursor: "pointer",
   },
-  btnAcaoPillTexto: { color: "#2563eb", fontSize: 12, fontWeight: 700 },
+  btnAcaoPillTexto: {
+    color: IFPE.primary,
+    fontSize: 12,
+    fontWeight: 700,
+  },
   btnAcaoManutencao: {
     backgroundColor: "#fffbeb",
     borderColor: "#fde68a",
@@ -1032,16 +1132,20 @@ const styles = {
   btnEditarMaterial: {
     flex: 1,
     display: "flex",
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "12px 0",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    border: "1px solid #bfdbfe",
+    border: `1px solid ${IFPE.primaryBorder}`,
     cursor: "pointer",
   },
-  btnEditarMaterialTexto: { color: "#2563eb", fontWeight: 700, fontSize: 14 },
+  btnEditarMaterialTexto: {
+    color: IFPE.primary,
+    fontWeight: 700,
+    fontSize: 14,
+  },
   btnExcluirMaterial: {
     flex: 1,
     display: "flex",
@@ -1054,7 +1158,11 @@ const styles = {
     border: "1px solid #fecaca",
     cursor: "pointer",
   },
-  btnExcluirMaterialTexto: { color: "#dc2626", fontWeight: 700, fontSize: 14 },
+  btnExcluirMaterialTexto: {
+    color: "#dc2626",
+    fontWeight: 700,
+    fontSize: 14,
+  },
 
   historicoTabsContainer: {
     display: "flex",
@@ -1076,9 +1184,16 @@ const styles = {
     border: "none",
     cursor: "pointer",
   },
-  historicoTabBtnAtivo: { backgroundColor: "#eff6ff" },
-  historicoTabTexto: { fontSize: 13, fontWeight: 600, color: "#64748b" },
-  historicoTabTextoAtivo: { color: "#2563eb", fontWeight: 700 },
+  historicoTabBtnAtivo: { backgroundColor: IFPE.primaryLight },
+  historicoTabTexto: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#64748b",
+  },
+  historicoTabTextoAtivo: {
+    color: IFPE.primary,
+    fontWeight: 700,
+  },
 
   vazioHistorico: {
     display: "flex",
@@ -1174,7 +1289,7 @@ const styles = {
     maxWidth: 480,
     margin: "0 auto",
     display: "flex",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     padding: "14px 0",
     borderRadius: 12,
     alignItems: "center",
@@ -1182,10 +1297,10 @@ const styles = {
     gap: 8,
     border: "none",
     cursor: "pointer",
+    boxShadow: "0 4px 12px rgba(21, 128, 61, 0.3)",
   },
   btnLoteTexto: { color: "#ffffff", fontWeight: 700, fontSize: 15 },
 
-  // Modal QR
   modalQrOverlay: {
     position: "fixed",
     inset: 0,
@@ -1219,7 +1334,7 @@ const styles = {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -1276,21 +1391,21 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#eff6ff",
-    border: "1px solid #bfdbfe",
+    backgroundColor: IFPE.primaryLight,
+    border: `1px solid ${IFPE.primaryBorder}`,
     padding: "10px 16px",
     borderRadius: 12,
     marginBottom: 12,
     cursor: "pointer",
   },
   btnRegenerarModalTexto: {
-    color: "#2563eb",
+    color: IFPE.primary,
     fontSize: 13,
     fontWeight: 700,
   },
   btnModalQrFechar: {
     width: "100%",
-    backgroundColor: "#0f172a",
+    backgroundColor: IFPE.primaryDark,
     padding: "13px 0",
     borderRadius: 14,
     border: "none",
@@ -1304,7 +1419,7 @@ const styles = {
     width: 28,
     height: 28,
     border: "3px solid #e2e8f0",
-    borderTop: "3px solid #2563eb",
+    borderTop: `3px solid ${IFPE.primary}`,
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
@@ -1312,15 +1427,15 @@ const styles = {
     width: 40,
     height: 40,
     border: "3px solid #e2e8f0",
-    borderTop: "3px solid #2563eb",
+    borderTop: `3px solid ${IFPE.primary}`,
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
   spinnerSmall: {
     width: 16,
     height: 16,
-    border: "2px solid #bfdbfe",
-    borderTop: "2px solid #2563eb",
+    border: `2px solid ${IFPE.primaryBorder}`,
+    borderTop: `2px solid ${IFPE.primary}`,
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
   },

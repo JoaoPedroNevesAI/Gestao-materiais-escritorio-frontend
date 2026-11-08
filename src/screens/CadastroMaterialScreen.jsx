@@ -15,21 +15,29 @@ import {
   IoSaveOutline,
   IoPricetag,
   IoLocation,
+  IoAddCircleOutline,
 } from "react-icons/io5";
 import api from "../services/api";
 import Toast from "../components/Toast";
+
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+};
 
 export default function CadastroMaterialScreen() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Material vindo pela navegação (modo edição)
   const materialEdicao = location.state?.material || null;
   const modoEdicao = !!materialEdicao;
 
   const [nome, setNome] = useState(materialEdicao?.nome || "");
   const [imagemUri, setImagemUri] = useState(materialEdicao?.imagem || "");
-  const [imagemFile, setImagemFile] = useState(null); // arquivo real para upload
+  const [imagemFile, setImagemFile] = useState(null);
   const [quantidade, setQuantidade] = useState(
     materialEdicao?.quantidade ? String(materialEdicao.quantidade) : "1"
   );
@@ -47,6 +55,12 @@ export default function CadastroMaterialScreen() {
 
   const [modalCat, setModalCat] = useState(false);
   const [modalLoc, setModalLoc] = useState(false);
+
+  // Criar categoria / local
+  const [novoNomeCat, setNovoNomeCat] = useState("");
+  const [novoNomeLoc, setNovoNomeLoc] = useState("");
+  const [salvandoCat, setSalvandoCat] = useState(false);
+  const [salvandoLoc, setSalvandoLoc] = useState(false);
 
   const [toast, setToast] = useState({
     visivel: false,
@@ -86,7 +100,56 @@ export default function CadastroMaterialScreen() {
     }
   };
 
-  // ===== SELEÇÃO DE IMAGEM (web) =====
+  const criarCategoria = async () => {
+    const nomeCat = novoNomeCat.trim();
+    if (!nomeCat) {
+      mostrarToast("Informe o nome da categoria.", "aviso");
+      return;
+    }
+    setSalvandoCat(true);
+    try {
+      const { data } = await api.post("/categoria", { nome: nomeCat });
+      const criada = data || { id: data?.id, nome: nomeCat };
+      setCategorias((prev) => [...prev, criada]);
+      setCategoriaSelecionada(criada);
+      setNovoNomeCat("");
+      mostrarToast("Categoria criada!", "sucesso");
+      setModalCat(false);
+    } catch (error) {
+      mostrarToast(
+        error.response?.data?.message || "Erro ao criar categoria.",
+        "erro"
+      );
+    } finally {
+      setSalvandoCat(false);
+    }
+  };
+
+  const criarLocal = async () => {
+    const nomeLoc = novoNomeLoc.trim();
+    if (!nomeLoc) {
+      mostrarToast("Informe o nome do local.", "aviso");
+      return;
+    }
+    setSalvandoLoc(true);
+    try {
+      const { data } = await api.post("/local", { nome: nomeLoc });
+      const criado = data || { id: data?.id, nome: nomeLoc };
+      setLocais((prev) => [...prev, criado]);
+      setLocalSelecionado(criado);
+      setNovoNomeLoc("");
+      mostrarToast("Local criado!", "sucesso");
+      setModalLoc(false);
+    } catch (error) {
+      mostrarToast(
+        error.response?.data?.message || "Erro ao criar local.",
+        "erro"
+      );
+    } finally {
+      setSalvandoLoc(false);
+    }
+  };
+
   const escolherImagem = () => {
     fileInputRef.current?.click();
   };
@@ -95,7 +158,6 @@ export default function CadastroMaterialScreen() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validação simples
     if (!file.type.startsWith("image/")) {
       mostrarToast("Selecione apenas arquivos de imagem.", "aviso");
       return;
@@ -116,7 +178,6 @@ export default function CadastroMaterialScreen() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // ===== VALIDAÇÃO =====
   const validar = () => {
     if (!nome.trim()) {
       mostrarToast("Informe o nome do material.", "aviso");
@@ -138,7 +199,6 @@ export default function CadastroMaterialScreen() {
     return true;
   };
 
-  // ===== SALVAR =====
   const handleSalvar = async () => {
     if (!validar()) return;
     setLoading(true);
@@ -150,7 +210,6 @@ export default function CadastroMaterialScreen() {
       localId: localSelecionado.id,
     };
 
-    // Mantém imagem antiga se não trocou
     const isImagemNova = !!imagemFile;
     if (modoEdicao && materialEdicao?.imagem && !isImagemNova) {
       payload.imagem = materialEdicao.imagem;
@@ -167,10 +226,13 @@ export default function CadastroMaterialScreen() {
         materialId = response.data.id;
       }
 
-      // Upload da imagem (se nova)
       if (isImagemNova && imagemFile) {
         const formData = new FormData();
-        formData.append("imagem", imagemFile, imagemFile.name || "imagem_upload.jpg");
+        formData.append(
+          "imagem",
+          imagemFile,
+          imagemFile.name || "imagem_upload.jpg"
+        );
 
         await api.post(`/material/${materialId}/imagem`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
@@ -200,7 +262,6 @@ export default function CadastroMaterialScreen() {
     setQuantidade(String(novo));
   };
 
-  // ===== MODAL REUTILIZÁVEL =====
   const renderModal = (
     visivel,
     setVisivel,
@@ -208,55 +269,104 @@ export default function CadastroMaterialScreen() {
     selecionado,
     setSelecionado,
     titulo,
-    IconHeader
+    IconHeader,
+    // extras para criar item
+    tipoCriacao // "categoria" | "local"
   ) => {
     if (!visivel) return null;
 
+    const isCat = tipoCriacao === "categoria";
+    const novoNome = isCat ? novoNomeCat : novoNomeLoc;
+    const setNovoNome = isCat ? setNovoNomeCat : setNovoNomeLoc;
+    const salvando = isCat ? salvandoCat : salvandoLoc;
+    const onCriar = isCat ? criarCategoria : criarLocal;
+
     return (
       <div style={styles.modalOverlay} onClick={() => setVisivel(false)}>
-        <div
-          style={styles.modalContent}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
           <div style={styles.modalHandle} />
 
           <div style={styles.modalHeader}>
             <div style={styles.modalHeaderIconBox}>
-              <IconHeader size={20} color="#2563eb" />
+              <IconHeader size={20} color={IFPE.primary} />
             </div>
             <h3 style={styles.modalTitle}>{titulo}</h3>
           </div>
 
           <div style={styles.modalLista}>
-            {dados.map((item) => {
-              const isSelected = selecionado?.id === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  style={{
-                    ...styles.modalItem,
-                    ...(isSelected ? styles.modalItemSelected : {}),
-                  }}
-                  onClick={() => {
-                    setSelecionado(item);
-                    setVisivel(false);
-                  }}
-                >
-                  <span
+            {dados.length === 0 ? (
+              <p style={styles.modalVazio}>
+                Nenhum item cadastrado. Crie o primeiro abaixo.
+              </p>
+            ) : (
+              dados.map((item) => {
+                const isSelected = selecionado?.id === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
                     style={{
-                      ...styles.modalItemText,
-                      ...(isSelected ? styles.modalItemTextSelected : {}),
+                      ...styles.modalItem,
+                      ...(isSelected ? styles.modalItemSelected : {}),
+                    }}
+                    onClick={() => {
+                      setSelecionado(item);
+                      setVisivel(false);
                     }}
                   >
-                    {item.nome || item.descricao}
-                  </span>
-                  {isSelected && (
-                    <IoCheckmarkCircle size={20} color="#2563eb" />
-                  )}
-                </button>
-              );
-            })}
+                    <span
+                      style={{
+                        ...styles.modalItemText,
+                        ...(isSelected ? styles.modalItemTextSelected : {}),
+                      }}
+                    >
+                      {item.nome || item.descricao}
+                    </span>
+                    {isSelected && (
+                      <IoCheckmarkCircle size={20} color={IFPE.primary} />
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Criar novo */}
+          <div style={styles.criarBox}>
+            <span style={styles.criarLabel}>
+              {isCat ? "Nova categoria" : "Novo local"}
+            </span>
+            <div style={styles.criarRow}>
+              <input
+                style={styles.criarInput}
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                placeholder={
+                  isCat ? "Ex: Informática" : "Ex: Sala 12 / Almoxarifado"
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onCriar();
+                }}
+              />
+              <button
+                type="button"
+                style={{
+                  ...styles.criarBtn,
+                  ...(salvando ? styles.saveBtnDisabled : {}),
+                }}
+                onClick={onCriar}
+                disabled={salvando}
+              >
+                {salvando ? (
+                  <div style={styles.spinnerSmall} />
+                ) : (
+                  <>
+                    <IoAddCircleOutline size={18} color="#fff" />
+                    <span>Criar</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <button
@@ -280,7 +390,6 @@ export default function CadastroMaterialScreen() {
         onClose={() => setToast((t) => ({ ...t, visivel: false }))}
       />
 
-      {/* Input de arquivo escondido */}
       <input
         ref={fileInputRef}
         type="file"
@@ -290,7 +399,6 @@ export default function CadastroMaterialScreen() {
       />
 
       <div style={styles.container}>
-        {/* ===== FOTOGRAFIA ===== */}
         <div style={styles.card}>
           <h2 style={styles.cardSectionTitle}>FOTOGRAFIA DO BEM</h2>
 
@@ -326,7 +434,7 @@ export default function CadastroMaterialScreen() {
               onClick={escolherImagem}
             >
               <div style={styles.cameraIconBox}>
-                <IoCameraOutline size={28} color="#2563eb" />
+                <IoCameraOutline size={28} color={IFPE.primary} />
               </div>
               <span style={styles.imagePickerTitle}>
                 Adicionar foto do material
@@ -338,7 +446,6 @@ export default function CadastroMaterialScreen() {
           )}
         </div>
 
-        {/* ===== IDENTIFICAÇÃO ===== */}
         <div style={styles.card}>
           <h2 style={styles.cardSectionTitle}>IDENTIFICAÇÃO</h2>
 
@@ -351,7 +458,7 @@ export default function CadastroMaterialScreen() {
           >
             <IoCubeOutline
               size={18}
-              color={camposFocados.nome ? "#2563eb" : "#94a3b8"}
+              color={camposFocados.nome ? IFPE.primary : "#94a3b8"}
               style={styles.inputIcon}
             />
             <input
@@ -375,7 +482,7 @@ export default function CadastroMaterialScreen() {
                   style={styles.stepperBtn}
                   onClick={() => alterarQuantidade(-1)}
                 >
-                  <IoRemove size={20} color="#2563eb" />
+                  <IoRemove size={20} color={IFPE.primary} />
                 </button>
                 <input
                   style={styles.stepperInput}
@@ -389,7 +496,7 @@ export default function CadastroMaterialScreen() {
                   style={styles.stepperBtn}
                   onClick={() => alterarQuantidade(1)}
                 >
-                  <IoAdd size={20} color="#2563eb" />
+                  <IoAdd size={20} color={IFPE.primary} />
                 </button>
               </div>
               <p style={styles.helperText}>
@@ -400,7 +507,6 @@ export default function CadastroMaterialScreen() {
           )}
         </div>
 
-        {/* ===== CLASSIFICAÇÃO & LOCAL ===== */}
         <div style={styles.card}>
           <h2 style={styles.cardSectionTitle}>
             CLASSIFICAÇÃO & LOCALIZAÇÃO
@@ -415,7 +521,7 @@ export default function CadastroMaterialScreen() {
             <div style={styles.selectorLeft}>
               <IoPricetagOutline
                 size={18}
-                color="#2563eb"
+                color={IFPE.primary}
                 style={{ marginRight: 10 }}
               />
               <span
@@ -442,7 +548,7 @@ export default function CadastroMaterialScreen() {
             <div style={styles.selectorLeft}>
               <IoLocationOutline
                 size={18}
-                color="#2563eb"
+                color={IFPE.primary}
                 style={{ marginRight: 10 }}
               />
               <span
@@ -461,7 +567,6 @@ export default function CadastroMaterialScreen() {
           </button>
         </div>
 
-        {/* ===== BOTÃO SALVAR ===== */}
         <button
           type="button"
           style={{
@@ -490,7 +595,6 @@ export default function CadastroMaterialScreen() {
         </button>
       </div>
 
-      {/* Modais */}
       {renderModal(
         modalCat,
         setModalCat,
@@ -498,7 +602,8 @@ export default function CadastroMaterialScreen() {
         categoriaSelecionada,
         setCategoriaSelecionada,
         "Selecione a Categoria",
-        IoPricetag
+        IoPricetag,
+        "categoria"
       )}
       {renderModal(
         modalLoc,
@@ -507,13 +612,13 @@ export default function CadastroMaterialScreen() {
         localSelecionado,
         setLocalSelecionado,
         "Local de Armazenamento",
-        IoLocation
+        IoLocation,
+        "local"
       )}
     </div>
   );
 }
 
-// ====================== ESTILOS ======================
 const styles = {
   page: {
     minHeight: "100%",
@@ -537,7 +642,7 @@ const styles = {
   cardSectionTitle: {
     fontSize: 11.5,
     fontWeight: 800,
-    color: "#2563eb",
+    color: IFPE.primary,
     letterSpacing: 0.8,
     margin: "0 0 12px 0",
   },
@@ -560,7 +665,7 @@ const styles = {
     height: 48,
   },
   inputWrapperFocado: {
-    borderColor: "#2563eb",
+    borderColor: IFPE.primary,
     backgroundColor: "#ffffff",
   },
   inputIcon: {
@@ -577,8 +682,6 @@ const styles = {
     color: "#0f172a",
     fontWeight: 500,
   },
-
-  // Stepper
   stepperContainer: {
     display: "flex",
     alignItems: "center",
@@ -592,7 +695,7 @@ const styles = {
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     border: "none",
     display: "flex",
     justifyContent: "center",
@@ -616,12 +719,10 @@ const styles = {
     marginTop: 6,
     lineHeight: 1.4,
   },
-
-  // Imagem
   imagePickerBtn: {
     width: "100%",
     backgroundColor: "#f8fafc",
-    border: "1.5px dashed #cbd5e1",
+    border: `1.5px dashed ${IFPE.primaryBorder}`,
     borderRadius: 16,
     padding: "24px 16px",
     display: "flex",
@@ -633,7 +734,7 @@ const styles = {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -687,8 +788,6 @@ const styles = {
     fontSize: 12,
     fontWeight: 700,
   },
-
-  // Seletores
   selectorBtn: {
     width: "100%",
     display: "flex",
@@ -716,11 +815,9 @@ const styles = {
     fontSize: 14,
     color: "#94a3b8",
   },
-
-  // Salvar
   saveBtn: {
     width: "100%",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     height: 52,
     borderRadius: 16,
     display: "flex",
@@ -729,7 +826,7 @@ const styles = {
     marginTop: 8,
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+    boxShadow: "0 4px 12px rgba(21, 128, 61, 0.3)",
   },
   saveBtnDisabled: {
     opacity: 0.65,
@@ -753,8 +850,14 @@ const styles = {
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
   },
-
-  // Modal
+  spinnerSmall: {
+    width: 16,
+    height: 16,
+    border: "2px solid rgba(255,255,255,0.3)",
+    borderTop: "2px solid #ffffff",
+    borderRadius: "50%",
+    animation: "spin 0.7s linear infinite",
+  },
   modalOverlay: {
     position: "fixed",
     inset: 0,
@@ -793,7 +896,7 @@ const styles = {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -809,6 +912,13 @@ const styles = {
     overflowY: "auto",
     flex: 1,
   },
+  modalVazio: {
+    textAlign: "center",
+    color: "#94a3b8",
+    fontSize: 13,
+    padding: "16px 0",
+    margin: 0,
+  },
   modalItem: {
     width: "100%",
     display: "flex",
@@ -823,7 +933,7 @@ const styles = {
     textAlign: "left",
   },
   modalItemSelected: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
   },
   modalItemText: {
     fontSize: 14.5,
@@ -831,8 +941,49 @@ const styles = {
     fontWeight: 500,
   },
   modalItemTextSelected: {
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 700,
+  },
+  criarBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTop: "1px solid #f1f5f9",
+  },
+  criarLabel: {
+    display: "block",
+    fontSize: 11,
+    fontWeight: 700,
+    color: "#475569",
+    marginBottom: 8,
+    letterSpacing: 0.4,
+  },
+  criarRow: {
+    display: "flex",
+    gap: 8,
+  },
+  criarInput: {
+    flex: 1,
+    height: 42,
+    border: "1.5px solid #e2e8f0",
+    borderRadius: 12,
+    padding: "0 12px",
+    fontSize: 14,
+    outline: "none",
+    color: "#0f172a",
+  },
+  criarBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: IFPE.primary,
+    color: "#fff",
+    border: "none",
+    borderRadius: 12,
+    padding: "0 14px",
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   },
   modalCloseBtn: {
     marginTop: 14,

@@ -11,9 +11,17 @@ import {
 import api from "../services/api";
 import Toast from "../components/Toast";
 
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+};
+
 export default function NotificacoesScreen() {
   const [notificacoes, setNotificacoes] = useState([]);
-  const [filtro, setFiltro] = useState("todas"); // 'todas' | 'nao-lidas'
+  const [filtro, setFiltro] = useState("todas");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState({
@@ -57,7 +65,7 @@ export default function NotificacoesScreen() {
         prev.map((n) => (n.id === item.id ? { ...n, lida: true } : n))
       );
     } catch {
-      // Ignora falha silenciosa
+      // silencioso
     }
   };
 
@@ -65,7 +73,10 @@ export default function NotificacoesScreen() {
     try {
       await api.put("/notificacao/ler-todas");
       setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
-      mostrarToast("Todas as notificações foram marcadas como lidas.", "sucesso");
+      mostrarToast(
+        "Todas as notificações foram marcadas como lidas.",
+        "sucesso"
+      );
     } catch {
       mostrarToast("Erro ao marcar todas como lidas.", "erro");
     }
@@ -97,13 +108,17 @@ export default function NotificacoesScreen() {
   const obterIconeTipo = (tipo) => {
     switch (tipo) {
       case "MOVIMENTACAO":
-        return { Icon: IoSwapHorizontal, cor: "#1a73e8", bg: "#e8f0fe" };
+        return {
+          Icon: IoSwapHorizontal,
+          cor: IFPE.primary,
+          bg: IFPE.primaryLight,
+        };
       case "MANUTENCAO":
-        return { Icon: IoConstruct, cor: "#f2994a", bg: "#fef6ec" };
+        return { Icon: IoConstruct, cor: "#d97706", bg: "#fffbeb" };
       case "PENDENCIA":
-        return { Icon: IoTime, cor: "#9334ea", bg: "#f3e8ff" };
+        return { Icon: IoTime, cor: "#7c3aed", bg: "#f5f3ff" };
       default:
-        return { Icon: IoNotifications, cor: "#5f6368", bg: "#f1f3f4" };
+        return { Icon: IoNotifications, cor: "#64748b", bg: "#f1f5f9" };
     }
   };
 
@@ -116,7 +131,6 @@ export default function NotificacoesScreen() {
         onClose={() => setToast((t) => ({ ...t, visivel: false }))}
       />
 
-      {/* Barra de Filtros e Ação */}
       <div style={styles.topo}>
         <div style={styles.filtros}>
           <button
@@ -162,20 +176,19 @@ export default function NotificacoesScreen() {
             style={styles.btnMarcarTodas}
             onClick={marcarTodasComoLidas}
           >
-            <IoCheckmarkDone size={16} color="#1a73e8" />
+            <IoCheckmarkDone size={16} color={IFPE.primary} />
             <span style={styles.btnMarcarTodasTexto}>Marcar todas</span>
           </button>
         )}
       </div>
 
-      {/* Conteúdo */}
       {loading ? (
         <div style={styles.loadingBox}>
           <div style={styles.spinner} />
         </div>
       ) : notificacoes.length === 0 ? (
         <div style={styles.vazio}>
-          <IoNotificationsOffOutline size={54} color="#dadce0" />
+          <IoNotificationsOffOutline size={54} color="#cbd5e1" />
           <h3 style={styles.vazioTitulo}>Nenhuma notificação</h3>
           <p style={styles.vazioSub}>
             {filtro === "nao-lidas"
@@ -185,7 +198,6 @@ export default function NotificacoesScreen() {
         </div>
       ) : (
         <div style={styles.lista}>
-          {/* Botão de refresh manual (substitui o pull-to-refresh) */}
           <div style={styles.refreshRow}>
             <button
               type="button"
@@ -242,7 +254,7 @@ export default function NotificacoesScreen() {
                       }}
                       title="Excluir"
                     >
-                      <IoTrashOutline size={16} color="#9aa0a6" />
+                      <IoTrashOutline size={16} color="#94a3b8" />
                     </button>
                   </div>
                 </div>
@@ -258,7 +270,7 @@ export default function NotificacoesScreen() {
 const styles = {
   container: {
     minHeight: "100%",
-    backgroundColor: "#f4f6f9",
+    backgroundColor: "#f8fafc",
     fontFamily: "sans-serif",
   },
   topo: {
@@ -267,7 +279,7 @@ const styles = {
     alignItems: "center",
     padding: "12px 16px",
     backgroundColor: "#ffffff",
-    borderBottom: "1px solid #dadce0",
+    borderBottom: "1px solid #e2e8f0",
     position: "sticky",
     top: 0,
     zIndex: 10,
@@ -279,16 +291,16 @@ const styles = {
   chip: {
     padding: "6px 12px",
     borderRadius: 16,
-    backgroundColor: "#f1f3f4",
+    backgroundColor: "#f1f5f9",
     border: "none",
     cursor: "pointer",
   },
   chipAtivo: {
-    backgroundColor: "#1a73e8",
+    backgroundColor: IFPE.primary,
   },
   chipTexto: {
     fontSize: 13,
-    color: "#5f6368",
+    color: "#64748b",
     fontWeight: 600,
   },
   chipTextoAtivo: {
@@ -304,7 +316,7 @@ const styles = {
   },
   btnMarcarTodasTexto: {
     fontSize: 13,
-    color: "#1a73e8",
+    color: IFPE.primary,
     fontWeight: 600,
   },
   loadingBox: {
@@ -316,7 +328,7 @@ const styles = {
     width: 32,
     height: 32,
     border: "3px solid #e2e8f0",
-    borderTop: "3px solid #1a73e8",
+    borderTop: `3px solid ${IFPE.primary}`,
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
@@ -335,11 +347,11 @@ const styles = {
   },
   btnRefresh: {
     background: "transparent",
-    border: "1px solid #dadce0",
+    border: "1px solid #e2e8f0",
     borderRadius: 8,
     padding: "6px 12px",
     fontSize: 12,
-    color: "#5f6368",
+    color: "#64748b",
     cursor: "pointer",
     fontWeight: 600,
   },
@@ -348,15 +360,15 @@ const styles = {
     backgroundColor: "#ffffff",
     borderRadius: 12,
     padding: 14,
-    border: "1px solid #dadce0",
+    border: "1px solid #e2e8f0",
     gap: 12,
     cursor: "pointer",
     transition: "background-color 0.15s",
   },
   cardNaoLida: {
-    backgroundColor: "#f8faff",
-    borderColor: "#c5d8fa",
-    borderLeft: "4px solid #1a73e8",
+    backgroundColor: IFPE.primaryLight,
+    borderColor: IFPE.primaryBorder,
+    borderLeft: `4px solid ${IFPE.primary}`,
   },
   iconeContainer: {
     width: 38,
@@ -380,23 +392,23 @@ const styles = {
   },
   titulo: {
     fontSize: 14,
-    color: "#3c4043",
+    color: "#334155",
     fontWeight: 500,
   },
   tituloNegrito: {
     fontWeight: 700,
-    color: "#202124",
+    color: "#0f172a",
   },
   dotNaoLida: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#1a73e8",
+    backgroundColor: IFPE.primary,
     flexShrink: 0,
   },
   mensagem: {
     fontSize: 13,
-    color: "#5f6368",
+    color: "#64748b",
     lineHeight: 1.4,
     margin: "0 0 8px 0",
   },
@@ -407,7 +419,7 @@ const styles = {
   },
   data: {
     fontSize: 11,
-    color: "#9aa0a6",
+    color: "#94a3b8",
   },
   btnExcluir: {
     background: "transparent",
@@ -428,12 +440,12 @@ const styles = {
   vazioTitulo: {
     fontSize: 16,
     fontWeight: 700,
-    color: "#3c4043",
+    color: "#334155",
     margin: "12px 0 0 0",
   },
   vazioSub: {
     fontSize: 13,
-    color: "#9aa0a6",
+    color: "#94a3b8",
     marginTop: 6,
     lineHeight: 1.4,
     maxWidth: 320,

@@ -18,6 +18,10 @@ import {
   IoPerson,
   IoPersonOutline,
   IoAdd,
+  IoStatsChart,
+  IoStatsChartOutline,
+  IoDocumentText,
+  IoDocumentTextOutline,
 } from "react-icons/io5";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -34,7 +38,14 @@ import QrCodeScannerScreen from "./screens/QrCodeScannerScreen";
 import NotificacoesScreen from "./screens/NotificacoesScreen";
 import ManutencaoFormScreen from "./screens/ManutencaoFormScreen";
 import DashboardScreen from "./screens/DashboardScreen";
-// ====================== LAYOUT COM HEADER ======================
+import AuditoriaScreen from "./screens/AuditoriaScreen";
+
+const IFPE = {
+  primary: "#15803d",
+  headerBg: "#14532d",
+};
+
+// ====================== HEADER ======================
 function Header({ title, showBack = false, rightAction = null }) {
   const navigate = useNavigate();
 
@@ -42,7 +53,7 @@ function Header({ title, showBack = false, rightAction = null }) {
     <header style={styles.header}>
       <div style={styles.headerLeft}>
         {showBack && (
-          <button style={styles.backBtn} onClick={() => navigate(-1)}>
+          <button type="button" style={styles.backBtn} onClick={() => navigate(-1)}>
             ←
           </button>
         )}
@@ -53,7 +64,6 @@ function Header({ title, showBack = false, rightAction = null }) {
   );
 }
 
-// Botão "Novo Material" (só ADM)
 function BotaoNovoMaterial() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
@@ -62,6 +72,7 @@ function BotaoNovoMaterial() {
 
   return (
     <button
+      type="button"
       style={styles.addBtn}
       onClick={() => navigate("/materiais/cadastro")}
       title="Novo Material"
@@ -76,19 +87,56 @@ function TabBar() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
   const isAdm = usuario?.role === "ROLE_ADM";
 
+  // ADM: Painel | Materiais | Solicitações | Auditoria | Perfil
+  // (Movimentações continua acessível pelo Dashboard / rotas, sem lotar a tab bar)
   const tabs = isAdm
     ? [
-        { path: "/materiais", label: "Materiais", icon: IoCube, iconOutline: IoCubeOutline },
-        { path: "/movimentacoes", label: "Movimentações", icon: IoSwapHorizontal, iconOutline: IoSwapHorizontalOutline },
-        { path: "/solicitacoes", label: "Solicitações", icon: IoTime, iconOutline: IoTimeOutline },
-        { path: "/perfil", label: "Perfil", icon: IoPerson, iconOutline: IoPersonOutline },
+        {
+          path: "/dashboard",
+          label: "Painel",
+          icon: IoStatsChart,
+          iconOutline: IoStatsChartOutline,
+        },
+        {
+          path: "/materiais",
+          label: "Materiais",
+          icon: IoCube,
+          iconOutline: IoCubeOutline,
+        },
+        {
+          path: "/solicitacoes",
+          label: "Solicitações",
+          icon: IoTime,
+          iconOutline: IoTimeOutline,
+        },
+        {
+          path: "/auditoria",
+          label: "Auditoria",
+          icon: IoDocumentText,
+          iconOutline: IoDocumentTextOutline,
+        },
+        {
+          path: "/perfil",
+          label: "Perfil",
+          icon: IoPerson,
+          iconOutline: IoPersonOutline,
+        },
       ]
     : [
-        { path: "/materiais", label: "Materiais", icon: IoCube, iconOutline: IoCubeOutline },
-        { path: "/perfil", label: "Perfil", icon: IoPerson, iconOutline: IoPersonOutline },
+        {
+          path: "/materiais",
+          label: "Materiais",
+          icon: IoCube,
+          iconOutline: IoCubeOutline,
+        },
+        {
+          path: "/perfil",
+          label: "Perfil",
+          icon: IoPerson,
+          iconOutline: IoPersonOutline,
+        },
       ];
 
   return (
@@ -96,18 +144,20 @@ function TabBar() {
       {tabs.map((tab) => {
         const ativo = location.pathname.startsWith(tab.path);
         const Icon = ativo ? tab.icon : tab.iconOutline;
+        const cor = ativo ? IFPE.primary : "#64748b";
 
         return (
           <button
             key={tab.path}
+            type="button"
             style={styles.tabItem}
             onClick={() => navigate(tab.path)}
           >
-            <Icon size={22} color={ativo ? "#2563eb" : "#64748b"} />
+            <Icon size={22} color={cor} />
             <span
               style={{
                 ...styles.tabLabel,
-                color: ativo ? "#2563eb" : "#64748b",
+                color: cor,
                 fontWeight: ativo ? 700 : 600,
               }}
             >
@@ -120,7 +170,6 @@ function TabBar() {
   );
 }
 
-// ====================== LAYOUT PRINCIPAL (com tabs) ======================
 function AppLayout() {
   return (
     <div style={styles.appLayout}>
@@ -132,7 +181,6 @@ function AppLayout() {
   );
 }
 
-// ====================== LOADING ======================
 function LoadingScreen() {
   return (
     <div style={styles.loading}>
@@ -147,7 +195,6 @@ function AppRoutes() {
 
   if (loading) return <LoadingScreen />;
 
-  // Não logado → Auth
   if (!usuario) {
     return (
       <Routes>
@@ -158,11 +205,38 @@ function AppRoutes() {
     );
   }
 
-  // Logado
+  const isAdm = usuario.role === "ROLE_ADM";
+  const homePath = isAdm ? "/dashboard" : "/materiais";
+
   return (
     <Routes>
-      {/* Layout com Bottom Tabs */}
       <Route element={<AppLayout />}>
+        {/* ===== DASHBOARD (ADM) ===== */}
+        {isAdm && (
+          <Route
+            path="/dashboard"
+            element={
+              <>
+                <Header title="Dashboard" />
+                <DashboardScreen />
+              </>
+            }
+          />
+        )}
+
+        {/* ===== AUDITORIA (ADM) ===== */}
+        {isAdm && (
+          <Route
+            path="/auditoria"
+            element={
+              <>
+                <Header title="Auditoria" />
+                <AuditoriaScreen />
+              </>
+            }
+          />
+        )}
+
         {/* ===== MATERIAIS ===== */}
         <Route path="/materiais">
           <Route
@@ -240,19 +314,10 @@ function AppRoutes() {
               </>
             }
           />
-          <Route
-  path="*"
-  element={
-    <Navigate
-      to={usuario.role === "ROLE_ADM" ? "/dashboard" : "/materiais"}
-      replace
-    />
-  }
-/>
         </Route>
 
-        {/* ===== MOVIMENTAÇÕES (só ADM) ===== */}
-        {usuario.role === "ROLE_ADM" && (
+        {/* ===== MOVIMENTAÇÕES (ADM) — rota mantida, link no Dashboard ===== */}
+        {isAdm && (
           <Route
             path="/movimentacoes"
             element={
@@ -264,8 +329,8 @@ function AppRoutes() {
           />
         )}
 
-        {/* ===== SOLICITAÇÕES (só ADM) ===== */}
-        {usuario.role === "ROLE_ADM" && (
+        {/* ===== SOLICITAÇÕES (ADM) ===== */}
+        {isAdm && (
           <Route
             path="/solicitacoes"
             element={
@@ -289,13 +354,12 @@ function AppRoutes() {
         />
       </Route>
 
-      {/* Redirecionamento padrão */}
-      <Route path="*" element={<Navigate to="/materiais" replace />} />
+      {/* Redirect padrão */}
+      <Route path="*" element={<Navigate to={homePath} replace />} />
     </Routes>
   );
 }
 
-// ====================== APP ======================
 export default function App() {
   return (
     <AuthProvider>
@@ -317,10 +381,10 @@ const styles = {
   content: {
     flex: 1,
     overflowY: "auto",
-    paddingBottom: 70, // espaço para a tab bar
+    paddingBottom: 70,
   },
   header: {
-    backgroundColor: "#1e293b",
+    backgroundColor: IFPE.headerBg,
     color: "#ffffff",
     height: 56,
     display: "flex",
@@ -387,7 +451,7 @@ const styles = {
     padding: "6px 0",
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
   },
   loading: {
     height: "100vh",
@@ -400,7 +464,7 @@ const styles = {
     width: 40,
     height: 40,
     border: "3px solid #e2e8f0",
-    borderTop: "3px solid #2563eb",
+    borderTop: `3px solid ${IFPE.primary}`,
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },

@@ -17,6 +17,15 @@ import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
 import NotificationBell from "../components/NotificationBell";
 
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+  headerBg: "#14532d",
+};
+
 export default function HomeScreen() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
@@ -144,7 +153,6 @@ export default function HomeScreen() {
         onClose={() => setToast((t) => ({ ...t, visivel: false }))}
       />
 
-      {/* Header custom (botões de ação) */}
       <div style={styles.headerActions}>
         {usuario?.role === "ROLE_ADM" && (
           <button
@@ -167,11 +175,14 @@ export default function HomeScreen() {
         <NotificationBell />
       </div>
 
-      {/* Barra de Busca e Filtro */}
       <div style={styles.topoContainer}>
         <div style={styles.buscaRow}>
           <div style={styles.buscaInputWrapper}>
-            <IoSearchOutline size={18} color="#64748b" style={{ marginRight: 8 }} />
+            <IoSearchOutline
+              size={18}
+              color="#64748b"
+              style={{ marginRight: 8 }}
+            />
             <input
               style={styles.buscaInput}
               value={busca}
@@ -206,7 +217,6 @@ export default function HomeScreen() {
           </button>
         </div>
 
-        {/* Chips de Categorias */}
         <div style={styles.chipsScroll}>
           <button
             type="button"
@@ -252,7 +262,6 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* Banner filtro ativo */}
       {filtrosAtivos && (
         <div style={styles.bannerFiltroAtivo}>
           <span style={styles.bannerFiltroTexto}>
@@ -261,13 +270,16 @@ export default function HomeScreen() {
               .filter(Boolean)
               .join(" • ")}
           </span>
-          <button type="button" style={styles.bannerLimparBtn} onClick={limparFiltros}>
+          <button
+            type="button"
+            style={styles.bannerLimparBtn}
+            onClick={limparFiltros}
+          >
             Limpar
           </button>
         </div>
       )}
 
-      {/* Lista */}
       {loading && !refreshing ? (
         <div style={styles.centerContainer}>
           <div style={styles.spinner} />
@@ -275,7 +287,6 @@ export default function HomeScreen() {
         </div>
       ) : (
         <div style={styles.lista}>
-          {/* Refresh manual */}
           <div style={styles.refreshRow}>
             <button
               type="button"
@@ -367,7 +378,9 @@ export default function HomeScreen() {
                           </span>
                         </div>
                         {valorFormatado && (
-                          <span style={styles.valorTexto}>{valorFormatado}</span>
+                          <span style={styles.valorTexto}>
+                            {valorFormatado}
+                          </span>
                         )}
                       </div>
 
@@ -375,7 +388,7 @@ export default function HomeScreen() {
 
                       <div style={styles.localRow}>
                         <div style={styles.localInfo}>
-                          <IoLocation size={13} color="#2563eb" />
+                          <IoLocation size={13} color={IFPE.primary} />
                           <span style={styles.localText}>
                             {item.local?.nome || "Local não definido"}
                           </span>
@@ -391,13 +404,9 @@ export default function HomeScreen() {
         </div>
       )}
 
-      {/* Modal de Filtros */}
       {modalFiltro && (
         <div style={styles.modalOverlay} onClick={() => setModalFiltro(false)}>
-          <div
-            style={styles.modalCard}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHandle} />
 
             <div style={styles.modalHeader}>
@@ -503,7 +512,7 @@ const styles = {
     alignItems: "center",
     gap: 8,
     padding: "8px 16px",
-    backgroundColor: "#1e293b",
+    backgroundColor: IFPE.headerBg,
     justifyContent: "flex-end",
   },
   headerBtn: {
@@ -567,7 +576,7 @@ const styles = {
     position: "relative",
   },
   btnFiltroAtivo: {
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
   },
   dotFiltro: {
     position: "absolute",
@@ -595,8 +604,8 @@ const styles = {
     flexShrink: 0,
   },
   chipAtivo: {
-    backgroundColor: "#2563eb",
-    borderColor: "#2563eb",
+    backgroundColor: IFPE.primary,
+    borderColor: IFPE.primary,
   },
   chipTexto: {
     fontSize: 13,
@@ -611,13 +620,13 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "8px 16px",
-    borderBottom: "1px solid #bfdbfe",
+    borderBottom: `1px solid ${IFPE.primaryBorder}`,
   },
   bannerFiltroTexto: {
     fontSize: 12,
-    color: "#1d4ed8",
+    color: IFPE.primaryText,
     fontWeight: 500,
     flex: 1,
   },
@@ -625,7 +634,7 @@ const styles = {
     background: "transparent",
     border: "none",
     fontSize: 12,
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 700,
     cursor: "pointer",
     marginLeft: 8,
@@ -666,7 +675,7 @@ const styles = {
     width: 36,
     height: 36,
     border: "3px solid #e2e8f0",
-    borderTop: "3px solid #2563eb",
+    borderTop: `3px solid ${IFPE.primary}`,
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
@@ -724,11 +733,15 @@ const styles = {
     marginBottom: 6,
   },
   categoriaPill: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "3px 8px",
     borderRadius: 6,
   },
-  categoriaPillTexto: { fontSize: 11, fontWeight: 700, color: "#2563eb" },
+  categoriaPillTexto: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: IFPE.primary,
+  },
   valorTexto: { fontSize: 13, fontWeight: 700, color: "#059669" },
   nomeText: {
     fontSize: 16,
@@ -795,17 +808,16 @@ const styles = {
   },
   btnLimparVazio: {
     marginTop: 18,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "10px 18px",
     borderRadius: 10,
     border: "none",
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 700,
     fontSize: 14,
     cursor: "pointer",
   },
 
-  // Modal
   modalOverlay: {
     position: "fixed",
     inset: 0,
@@ -876,8 +888,8 @@ const styles = {
     cursor: "pointer",
   },
   modalChipSelecionado: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#2563eb",
+    backgroundColor: IFPE.primaryLight,
+    borderColor: IFPE.primary,
   },
   modalChipTexto: {
     fontSize: 13,
@@ -885,7 +897,7 @@ const styles = {
     fontWeight: 500,
   },
   modalChipTextoSelecionado: {
-    color: "#2563eb",
+    color: IFPE.primary,
     fontWeight: 700,
   },
   modalAcoes: {
@@ -909,7 +921,7 @@ const styles = {
     flex: 1.5,
     padding: "14px 0",
     textAlign: "center",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     borderRadius: 12,
     border: "none",
     color: "#ffffff",

@@ -13,18 +13,30 @@ import {
 import api from "../services/api";
 import Toast from "../components/Toast";
 
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+};
+
 export default function SolicitacoesPendentesScreen() {
-  const [abaAtiva, setAbaAtiva] = useState("transferencias"); // 'transferencias' | 'manutencoes'
+  const [abaAtiva, setAbaAtiva] = useState("transferencias");
   const [transferencias, setTransferencias] = useState([]);
   const [manutencoes, setManutencoes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [itemSelecionado, setItemSelecionado] = useState(null);
-  const [acao, setAcao] = useState(null); // 'aprovar' | 'reprovar'
+  const [acao, setAcao] = useState(null);
   const [observacaoAdmin, setObservacaoAdmin] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const [toast, setToast] = useState({ visivel: false, tipo: "info", mensagem: "" });
+  const [toast, setToast] = useState({
+    visivel: false,
+    tipo: "info",
+    mensagem: "",
+  });
 
   const mostrarToast = (mensagem, tipo = "erro") =>
     setToast({ visivel: true, tipo, mensagem });
@@ -94,7 +106,8 @@ export default function SolicitacoesPendentesScreen() {
     });
   };
 
-  const dadosAtivos = abaAtiva === "transferencias" ? transferencias : manutencoes;
+  const dadosAtivos =
+    abaAtiva === "transferencias" ? transferencias : manutencoes;
 
   return (
     <div style={styles.container}>
@@ -105,25 +118,28 @@ export default function SolicitacoesPendentesScreen() {
         onClose={() => setToast((t) => ({ ...t, visivel: false }))}
       />
 
-      {/* Segmented Control de Abas */}
       <div style={styles.tabContainer}>
         <div style={styles.segmentedWrapper}>
           <button
             type="button"
             style={{
               ...styles.segmentedBtn,
-              ...(abaAtiva === "transferencias" ? styles.segmentedBtnAtivo : {}),
+              ...(abaAtiva === "transferencias"
+                ? styles.segmentedBtnAtivo
+                : {}),
             }}
             onClick={() => setAbaAtiva("transferencias")}
           >
             <IoSwapHorizontal
               size={16}
-              color={abaAtiva === "transferencias" ? "#2563eb" : "#64748b"}
+              color={abaAtiva === "transferencias" ? IFPE.primary : "#64748b"}
             />
             <span
               style={{
                 ...styles.segmentedBtnTexto,
-                ...(abaAtiva === "transferencias" ? styles.segmentedBtnTextoAtivo : {}),
+                ...(abaAtiva === "transferencias"
+                  ? styles.segmentedBtnTextoAtivo
+                  : {}),
               }}
             >
               Transferências
@@ -132,7 +148,9 @@ export default function SolicitacoesPendentesScreen() {
               <span
                 style={{
                   ...styles.contadorPill,
-                  ...(abaAtiva === "transferencias" ? styles.contadorPillAtivo : {}),
+                  ...(abaAtiva === "transferencias"
+                    ? styles.contadorPillAtivo
+                    : {}),
                 }}
               >
                 <span
@@ -159,12 +177,14 @@ export default function SolicitacoesPendentesScreen() {
           >
             <IoConstruct
               size={16}
-              color={abaAtiva === "manutencoes" ? "#2563eb" : "#64748b"}
+              color={abaAtiva === "manutencoes" ? IFPE.primary : "#64748b"}
             />
             <span
               style={{
                 ...styles.segmentedBtnTexto,
-                ...(abaAtiva === "manutencoes" ? styles.segmentedBtnTextoAtivo : {}),
+                ...(abaAtiva === "manutencoes"
+                  ? styles.segmentedBtnTextoAtivo
+                  : {}),
               }}
             >
               Manutenções
@@ -173,7 +193,9 @@ export default function SolicitacoesPendentesScreen() {
               <span
                 style={{
                   ...styles.contadorPill,
-                  ...(abaAtiva === "manutencoes" ? styles.contadorPillAtivo : {}),
+                  ...(abaAtiva === "manutencoes"
+                    ? styles.contadorPillAtivo
+                    : {}),
                 }}
               >
                 <span
@@ -192,9 +214,9 @@ export default function SolicitacoesPendentesScreen() {
         </div>
       </div>
 
-      {/* Lista de Solicitações */}
       {loading ? (
         <div style={styles.centerContainer}>
+          <div style={styles.spinner} />
           <span style={styles.loadingText}>Carregando solicitações...</span>
         </div>
       ) : dadosAtivos.length === 0 ? (
@@ -219,7 +241,7 @@ export default function SolicitacoesPendentesScreen() {
                       "Item"}
                   </h3>
                   <div style={styles.badgePatrimonio}>
-                    <IoBarcodeOutline size={12} color="#2563eb" />
+                    <IoBarcodeOutline size={12} color={IFPE.primary} />
                     <span style={styles.badgePatrimonioTexto}>
                       {item.patrimonio?.codigoPatrimonio ||
                         "PAT-" + item.patrimonio?.id}
@@ -282,7 +304,9 @@ export default function SolicitacoesPendentesScreen() {
                   onClick={() => abrirModal(item, "reprovar")}
                 >
                   <IoClose size={16} color="#dc2626" />
-                  <span style={{ color: "#dc2626", fontWeight: 600 }}>Reprovar</span>
+                  <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                    Reprovar
+                  </span>
                 </button>
 
                 <button
@@ -291,7 +315,9 @@ export default function SolicitacoesPendentesScreen() {
                   onClick={() => abrirModal(item, "aprovar")}
                 >
                   <IoCheckmark size={16} color="#ffffff" />
-                  <span style={{ color: "#ffffff", fontWeight: 600 }}>Aprovar</span>
+                  <span style={{ color: "#ffffff", fontWeight: 600 }}>
+                    Aprovar
+                  </span>
                 </button>
               </div>
             </div>
@@ -299,13 +325,14 @@ export default function SolicitacoesPendentesScreen() {
         </div>
       )}
 
-      {/* Modal de Confirmação */}
       {modalVisible && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHandle} />
             <h2 style={styles.modalTitulo}>
-              {acao === "aprovar" ? "Aprovar solicitação" : "Reprovar solicitação"}
+              {acao === "aprovar"
+                ? "Aprovar solicitação"
+                : "Reprovar solicitação"}
             </h2>
             <p style={styles.modalDesc}>
               {itemSelecionado?.patrimonio?.material?.nome ||
@@ -377,10 +404,10 @@ const styles = {
   segmentedWrapper: {
     display: "flex",
     backgroundColor: "#f1f5f9",
-    borderRadius: "14px",
-    padding: "4px",
-    gap: "4px",
-    maxWidth: "500px",
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    maxWidth: 500,
     margin: "0 auto",
   },
   segmentedBtn: {
@@ -388,9 +415,9 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "6px",
+    gap: 6,
     padding: "9px 0",
-    borderRadius: "10px",
+    borderRadius: 10,
     border: "none",
     backgroundColor: "transparent",
     cursor: "pointer",
@@ -400,58 +427,68 @@ const styles = {
     boxShadow: "0px 1px 3px rgba(15, 23, 42, 0.08)",
   },
   segmentedBtnTexto: {
-    fontSize: "13px",
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: 600,
     color: "#64748b",
   },
   segmentedBtnTextoAtivo: {
-    color: "#2563eb",
-    fontWeight: "700",
+    color: IFPE.primary,
+    fontWeight: 700,
   },
   contadorPill: {
     backgroundColor: "#e2e8f0",
     padding: "1px 6px",
-    borderRadius: "10px",
+    borderRadius: 10,
   },
   contadorPillAtivo: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
   },
   contadorPillTexto: {
-    fontSize: "11px",
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: 700,
     color: "#475569",
   },
   contadorPillTextoAtivo: {
-    color: "#2563eb",
+    color: IFPE.primary,
   },
   centerContainer: {
     display: "flex",
+    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     padding: "40px 0",
+    gap: 12,
+  },
+  spinner: {
+    width: 32,
+    height: 32,
+    border: "3px solid #e2e8f0",
+    borderTop: `3px solid ${IFPE.primary}`,
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
   },
   loadingText: {
-    fontSize: "14px",
+    fontSize: 14,
     color: "#64748b",
-    fontWeight: "500",
+    fontWeight: 500,
   },
   lista: {
-    padding: "16px",
+    padding: 16,
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-    gap: "12px",
-    maxWidth: "1200px",
+    gap: 12,
+    maxWidth: 1200,
     margin: "0 auto",
   },
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: "16px",
-    padding: "16px",
+    borderRadius: 16,
+    padding: 16,
     border: "1px solid #e2e8f0",
     boxShadow: "0px 1px 6px rgba(15, 23, 42, 0.04)",
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
+    gap: 10,
   },
   cardHeader: {
     display: "flex",
@@ -459,33 +496,33 @@ const styles = {
     alignItems: "flex-start",
   },
   cardMaterialNome: {
-    fontSize: "16px",
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: 700,
     color: "#0f172a",
     margin: 0,
   },
   badgePatrimonio: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "4px",
-    backgroundColor: "#eff6ff",
-    border: "1px solid #bfdbfe",
+    gap: 4,
+    backgroundColor: IFPE.primaryLight,
+    border: `1px solid ${IFPE.primaryBorder}`,
     padding: "3px 8px",
-    borderRadius: "6px",
-    marginTop: "4px",
+    borderRadius: 6,
+    marginTop: 4,
   },
   badgePatrimonioTexto: {
-    fontSize: "11px",
-    fontWeight: "700",
-    color: "#2563eb",
+    fontSize: 11,
+    fontWeight: 700,
+    color: IFPE.primary,
   },
   rotaBox: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#f8fafc",
-    padding: "10px",
-    borderRadius: "10px",
+    padding: 10,
+    borderRadius: 10,
     border: "1px solid #f1f5f9",
   },
   rotaItem: {
@@ -495,71 +532,71 @@ const styles = {
     flex: 1,
   },
   rotaLabel: {
-    fontSize: "10px",
+    fontSize: 10,
     color: "#94a3b8",
-    fontWeight: "700",
-    letterSpacing: "0.4px",
+    fontWeight: 700,
+    letterSpacing: 0.4,
   },
   rotaNome: {
-    fontSize: "13px",
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: 600,
     color: "#0f172a",
-    marginTop: "2px",
+    marginTop: 2,
     textAlign: "center",
   },
   solicitanteRow: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
+    gap: 6,
   },
   solicitanteTexto: {
-    fontSize: "13px",
+    fontSize: 13,
     color: "#64748b",
   },
   obsBox: {
     backgroundColor: "#f8fafc",
-    borderRadius: "8px",
-    padding: "10px",
-    borderLeft: "3px solid #2563eb",
+    borderRadius: 8,
+    padding: 10,
+    borderLeft: `3px solid ${IFPE.primary}`,
   },
   obsTexto: {
-    fontSize: "12px",
+    fontSize: 12,
     color: "#475569",
     fontStyle: "italic",
     margin: 0,
   },
   defeitoBox: {
     backgroundColor: "#fffbeb",
-    borderRadius: "10px",
-    padding: "12px",
+    borderRadius: 10,
+    padding: 12,
     border: "1px solid #fde68a",
   },
   defeitoLabel: {
-    fontSize: "11px",
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: 700,
     color: "#b45309",
     textTransform: "uppercase",
   },
   defeitoTexto: {
-    fontSize: "13px",
+    fontSize: 13,
     color: "#78350f",
-    marginTop: "3px",
+    marginTop: 3,
     fontStyle: "italic",
     margin: 0,
   },
   cardAcoes: {
     display: "flex",
-    gap: "10px",
-    marginTop: "4px",
+    gap: 10,
+    marginTop: 4,
   },
   btnAcao: {
     flex: 1,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "6px",
+    gap: 6,
     padding: "11px 0",
-    borderRadius: "10px",
+    borderRadius: 10,
     border: "none",
     cursor: "pointer",
   },
@@ -568,10 +605,10 @@ const styles = {
     border: "1px solid #fecaca",
   },
   btnAprovar: {
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
   },
   btnAprovarFull: {
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     color: "#ffffff",
   },
   btnReprovarFull: {
@@ -582,37 +619,34 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    marginTop: "60px",
+    marginTop: 60,
     padding: "0 32px",
   },
   vazioIcone: {
-    width: "80px",
-    height: "80px",
-    borderRadius: "40px",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: "#f1f5f9",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: "16px",
+    marginBottom: 16,
   },
   vazioTitulo: {
-    fontSize: "17px",
-    fontWeight: "700",
+    fontSize: 17,
+    fontWeight: 700,
     color: "#1e293b",
     margin: "0 0 6px 0",
   },
   vazioSub: {
-    fontSize: "13px",
+    fontSize: 13,
     color: "#94a3b8",
     textAlign: "center",
     margin: 0,
   },
   modalOverlay: {
     position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    inset: 0,
     backgroundColor: "rgba(15, 23, 42, 0.5)",
     display: "flex",
     justifyContent: "center",
@@ -621,34 +655,34 @@ const styles = {
   },
   modalCard: {
     backgroundColor: "#ffffff",
-    borderRadius: "16px",
-    padding: "20px",
+    borderRadius: 16,
+    padding: 20,
     width: "90%",
-    maxWidth: "480px",
+    maxWidth: 480,
   },
   modalHandle: {
-    width: "36px",
-    height: "4px",
+    width: 36,
+    height: 4,
     backgroundColor: "#cbd5e1",
-    borderRadius: "2px",
-    margin: "0 auto 16px auto",
+    borderRadius: 2,
+    margin: "0 auto 16px",
   },
   modalTitulo: {
-    fontSize: "18px",
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: 700,
     color: "#0f172a",
     margin: "0 0 4px 0",
   },
   modalDesc: {
-    fontSize: "13px",
+    fontSize: 13,
     color: "#64748b",
     margin: "0 0 16px 0",
   },
   labelInput: {
-    fontSize: "12px",
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: 700,
     color: "#475569",
-    marginBottom: "8px",
+    marginBottom: 8,
     display: "block",
     textTransform: "uppercase",
   },
@@ -656,34 +690,35 @@ const styles = {
     width: "100%",
     backgroundColor: "#f8fafc",
     border: "1px solid #e2e8f0",
-    borderRadius: "12px",
-    padding: "12px",
-    fontSize: "14px",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
     color: "#0f172a",
-    marginBottom: "20px",
+    marginBottom: 20,
     boxSizing: "border-box",
     resize: "vertical",
+    fontFamily: "inherit",
   },
   modalAcoes: {
     display: "flex",
-    gap: "12px",
+    gap: 12,
   },
   modalBtnCancelar: {
     flex: 1,
     padding: "14px 0",
     backgroundColor: "#f1f5f9",
-    borderRadius: "12px",
+    borderRadius: 12,
     border: "none",
     color: "#475569",
-    fontWeight: "600",
+    fontWeight: 600,
     cursor: "pointer",
   },
   modalBtnConfirmar: {
     flex: 1.5,
     padding: "14px 0",
-    borderRadius: "12px",
+    borderRadius: 12,
     border: "none",
-    fontWeight: "700",
+    fontWeight: 700,
     cursor: "pointer",
   },
 };

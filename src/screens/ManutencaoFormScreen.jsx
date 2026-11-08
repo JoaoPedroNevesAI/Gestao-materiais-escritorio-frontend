@@ -9,6 +9,14 @@ import {
 import api from "../services/api";
 import Toast from "../components/Toast";
 
+const IFPE = {
+  primary: "#15803d",
+  primaryDark: "#166534",
+  primaryLight: "#f0fdf4",
+  primaryBorder: "#bbf7d0",
+  primaryText: "#14532d",
+};
+
 export default function ManutencaoFormScreen() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,8 +54,15 @@ export default function ManutencaoFormScreen() {
       mostrarToast("Solicitação de manutenção enviada com sucesso!", "sucesso");
       setTimeout(() => navigate(-1), 1500);
     } catch (error) {
-      const msg =
+      const status = error.response?.status;
+      let msg =
         error.response?.data?.message || "Erro ao solicitar manutenção.";
+      if (status === 403) {
+        msg =
+          "Sem permissão para solicitar manutenção. Verifique as regras de acesso no backend.";
+      } else if (status === 401) {
+        msg = "Sessão expirada. Faça login novamente.";
+      }
       mostrarToast(msg, "erro");
     } finally {
       setLoading(false);
@@ -64,7 +79,6 @@ export default function ManutencaoFormScreen() {
       />
 
       <div style={styles.container}>
-        {/* Card do Patrimônio */}
         <div style={styles.card}>
           <div style={styles.badgeManutencao}>
             <IoBuild size={13} color="#b45309" />
@@ -76,7 +90,7 @@ export default function ManutencaoFormScreen() {
           </h2>
 
           <div style={styles.patrimonioPill}>
-            <IoBarcodeOutline size={12} color="#2563eb" />
+            <IoBarcodeOutline size={12} color={IFPE.primary} />
             <span style={styles.patrimonioPillText}>
               {patrimonio?.codigoPatrimonio || "PAT-" + patrimonio?.id}
             </span>
@@ -95,7 +109,6 @@ export default function ManutencaoFormScreen() {
           </div>
         </div>
 
-        {/* Formulário */}
         <div style={styles.formCard}>
           <label style={styles.label}>
             MOTIVO / DESCRIÇÃO DO DEFEITO{" "}
@@ -194,16 +207,16 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#eff6ff",
+    backgroundColor: IFPE.primaryLight,
     padding: "3px 8px",
     borderRadius: 6,
     marginBottom: 10,
-    border: "1px solid #bfdbfe",
+    border: `1px solid ${IFPE.primaryBorder}`,
   },
   patrimonioPillText: {
     fontSize: 11.5,
     fontWeight: 700,
-    color: "#1e40af",
+    color: IFPE.primaryText,
   },
   linhaInfo: {
     display: "flex",
@@ -243,7 +256,7 @@ const styles = {
     marginBottom: 10,
   },
   inputWrapperFocado: {
-    borderColor: "#2563eb",
+    borderColor: IFPE.primary,
     backgroundColor: "#ffffff",
   },
   inputMultiline: {
@@ -266,7 +279,7 @@ const styles = {
   },
   btnEnviar: {
     width: "100%",
-    backgroundColor: "#2563eb",
+    backgroundColor: IFPE.primary,
     height: 50,
     borderRadius: 14,
     display: "flex",
@@ -274,7 +287,7 @@ const styles = {
     alignItems: "center",
     border: "none",
     cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+    boxShadow: "0 4px 12px rgba(21, 128, 61, 0.3)",
   },
   btnDesabilitado: {
     opacity: 0.65,

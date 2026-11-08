@@ -17,7 +17,6 @@ import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import Toast from "../components/Toast";
 
-// Cores IFPE
 const IFPE = {
   primary: "#15803d",
   primaryDark: "#166534",
@@ -69,6 +68,7 @@ export default function MovimentacaoFormScreen() {
     } else {
       setLoadingUsuarios(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -120,57 +120,85 @@ export default function MovimentacaoFormScreen() {
       return;
     }
 
+    const listaPatrimonios =
+      patrimonios && patrimonios.length > 0
+        ? patrimonios
+        : patrimonio
+        ? [patrimonio]
+        : material?.patrimonios?.[0]
+        ? [material.patrimonios[0]]
+        : [];
+
+    if (listaPatrimonios.length === 0) {
+      mostrarToast(
+        "Nenhum patrimônio identificado para transferir. Volte e selecione um item.",
+        "erro"
+      );
+      return;
+    }
+
+    // Mesmo endpoint para ADM e COLAB.
+    // Se o back criar path separado, use:
+    // const endpoint = isAdm ? "/movimentacao" : "/movimentacao/solicitar";
+    const endpoint = "/movimentacao";
+
     setLoading(true);
     try {
-      const payloadBase = {
-        localDestinoId: localSelecionado.id,
-        observacao: observacao || null,
-      };
+      await Promise.all(
+        listaPatrimonios.map((pat) => {
+          const payload = {
+            patrimonioId: pat.id,
+            localDestinoId: localSelecionado.id,
+            observacao: observacao?.trim() || null,
+          };
 
-      // Se o back esperar solicitanteId no ADM, descomente:
-      // if (isAdm && usuarioSelecionado?.id) {
-      //   payloadBase.solicitanteId = usuarioSelecionado.id;
-      // }
+          // Descomente se o back exigir:
+          // if (isAdm && usuarioSelecionado?.id) {
+          //   payload.solicitanteId = usuarioSelecionado.id;
+          // }
 
-      if (patrimonios && patrimonios.length > 0) {
-        await Promise.all(
-          patrimonios.map((pat) =>
-            api.post("/movimentacao", {
-              ...payloadBase,
-              patrimonioId: pat.id,
-            })
-          )
-        );
-        mostrarToast(
-          isAdm
-            ? `${patrimonios.length} transferência(s) confirmada(s)!`
-            : `${patrimonios.length} solicitação(ões) enviada(s)! Aguardando aprovação.`,
-          "sucesso"
-        );
-      } else {
-        const targetPatrimonioId = patrimonio
-          ? patrimonio.id
-          : material?.patrimonios?.[0]?.id || material?.id;
+          return api.post(endpoint, payload);
+        })
+      );
 
-        await api.post("/movimentacao", {
-          ...payloadBase,
-          patrimonioId: targetPatrimonioId,
-        });
-        mostrarToast(
-          isAdm
-            ? "Transferência confirmada com sucesso!"
-            : "Solicitação de transferência enviada! Aguardando aprovação do administrador.",
-          "sucesso"
-        );
-      }
+      mostrarToast(
+        isAdm
+          ? listaPatrimonios.length > 1
+            ? `${listaPatrimonios.length} transferência(s) confirmada(s)!`
+            : "Transferência confirmada com sucesso!"
+          : listaPatrimonios.length > 1
+          ? `${listaPatrimonios.length} solicitação(ões) enviada(s)! Aguardando aprovação.`
+          : "Solicitação enviada! Aguardando aprovação do administrador.",
+        "sucesso"
+      );
       setTimeout(() => navigate("/materiais"), 1500);
     } catch (error) {
-      const msg =
-        error.response?.data?.message ||
-        (isAdm
-          ? "Erro ao confirmar transferência."
-          : "Erro ao enviar solicitação de transferência.");
-      mostrarToast(msg, "erro");
+      const status = error.response?.status;
+      const msgBack = error.response?.data?.message;
+
+      if (status === 401) {
+        mostrarToast("Sessão expirada. Faça login novamente.", "erro");
+      } else if (status === 403) {
+        mostrarToast(
+          msgBack ||
+            "Sem permissão para esta ação. Confirme se a branch de regras de movimentação está ativa no backend e se o colaborador pode solicitar transferência.",
+          "erro"
+        );
+      } else if (status === 400) {
+        mostrarToast(
+          msgBack ||
+            "Dados inválidos. Verifique patrimônio e local de destino.",
+          "erro"
+        );
+      } else {
+        mostrarToast(
+          msgBack ||
+            (isAdm
+              ? "Erro ao confirmar transferência."
+              : "Erro ao enviar solicitação de transferência."),
+          "erro"
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -276,7 +304,6 @@ export default function MovimentacaoFormScreen() {
       />
 
       <div style={styles.container}>
-        {/* Card do material */}
         <div style={styles.materialCard}>
           <div style={styles.materialTagRow}>
             <IoCube size={14} color={IFPE.primary} />
@@ -314,12 +341,12 @@ export default function MovimentacaoFormScreen() {
 
           {!isAdm && (
             <p style={styles.avisoColab}>
-              Sua solicitação ficará pendente até a aprovação de um administrador.
+              Sua solicitação ficará pendente até a aprovação de um
+              administrador.
             </p>
           )}
         </div>
 
-        {/* Card Formulário */}
         <div style={styles.formCard}>
           {isAdm && (
             <>
@@ -658,7 +685,6 @@ const styles = {
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
   },
-
   modalOverlay: {
     position: "fixed",
     inset: 0,
