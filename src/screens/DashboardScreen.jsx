@@ -9,6 +9,7 @@ import {
   IoAlertCircleOutline,
   IoRefreshOutline,
   IoChevronForward,
+  IoCheckmarkDoneOutline,
 } from "react-icons/io5";
 import api from "../services/api";
 import Toast from "../components/Toast";
@@ -19,6 +20,38 @@ const IFPE = {
   primaryBorder: "#bbf7d0",
   primaryText: "#14532d",
 };
+
+/** Status que contam como "concluída / aprovada" (ajuste se o back usar outros nomes) */
+const STATUS_MOV_CONCLUIDA = new Set([
+  "APROVADA",
+  "APROVADO",
+  "CONCLUIDA",
+  "CONCLUIDO",
+  "FINALIZADA",
+  "FINALIZADO",
+]);
+const STATUS_MOV_PENDENTE = new Set([
+  "PENDENTE",
+  "AGUARDANDO",
+  "SOLICITADA",
+  "SOLICITADO",
+]);
+const STATUS_MANUT_CONCLUIDA = new Set([
+  "CONCLUIDA",
+  "CONCLUIDO",
+  "APROVADA",
+  "APROVADO",
+  "FINALIZADA",
+]);
+const STATUS_MANUT_PENDENTE = new Set(["PENDENTE", "AGUARDANDO"]);
+
+function normalizarStatus(s) {
+  return String(s || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
 export default function DashboardScreen() {
   const navigate = useNavigate();
@@ -32,8 +65,11 @@ export default function DashboardScreen() {
     emManutencao: 0,
     pendentesMov: 0,
     pendentesManut: 0,
+    concluidasMov: 0,
+    concluidasManut: 0,
   });
   const [ultimasMov, setUltimasMov] = useState([]);
+  const [ultimasManut, setUltimasManut] = useState([]);
   const [toast, setToast] = useState({
     visivel: false,
     tipo: "info",
@@ -46,11 +82,31 @@ export default function DashboardScreen() {
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const [resMat, resPend, resMov] = await Promise.all([
+      const [resMat, resPendMov, resMov] = await Promise.all([
         api.get("/material").catch(() => ({ data: [] })),
         api.get("/movimentacao/pendentes").catch(() => ({ data: [] })),
         api.get("/movimentacao").catch(() => ({ data: [] })),
       ]);
+
+      // Manutenções: tenta lista geral e pendentes
+      let listaManut = [];
+      let pendentesManutApi = null;
+      try {
+        const resManutAll = await api.get("/manutencao");
+        listaManut = Array.isArray(resManutAll.data)
+          ? resManutAll.data
+          : resManutAll.data?.content || [];
+      } catch {
+        listaManut = [];
+      }
+      try {
+        const resManutPend = await api.get("/manutencao/pendentes");
+        if (Array.isArray(resManutPend.data)) {
+          pendentesManutApi = resManutPend.data;
+        }
+      } catch {
+        // ignora
+      }
 
       const materiais = resMat.data || [];
       let totalPatrimonios = 0;
@@ -62,39 +118,78 @@ export default function DashboardScreen() {
         const pats = m.patrimonios || [];
         totalPatrimonios += pats.length || Number(m.quantidade) || 0;
         pats.forEach((p) => {
-          if (p.status === "DISPONIVEL") disponiveis++;
-          else if (p.status === "EM_USO") emUso++;
-          else if (p.status === "EM_MANUTENCAO") emManutencao++;
+          const st = normalizarStatus(p.status);
+          if (st === "DISPONIVEL") disponiveis++;
+          else if (st === "EM_USO") emUso++;
+          else if (st === "EM_MANUTENCAO") emManutencao++;
         });
       });
 
-      // Pendentes: array ou { transferencias, manutencoes }
-      const pendRaw = resPend.data;
+      // --- Movimentações ---
+      const todasMov = Array.isArray(resMov.data)
+        ? resMov.data
+        : resMov.data?.content || [];
+
       let pendentesMov = 0;
-      let pendentesManut = 0;
+      const pendRaw = resPendMov.data;
       if (Array.isArray(pendRaw)) {
         pendentesMov = pendRaw.length;
       } else if (pendRaw && typeof pendRaw === "object") {
-        pendentesMov = (pendRaw.transferencias || pendRaw.movimentacoes || []).length;
-        pendentesManut = (pendRaw.manutencoes || []).length;
+        pendentesMov = (
+          pendRaw.transferencias ||
+          pendRaw.movimentacoes ||
+          []
+        ).length;
+      } else {
+        pendentesMov = todasMov.filter((m) =>
+          STATUS_MOV_PENDENTE.has(normalizarStatus(m.status))
+        ).length;
       }
 
-      // Tenta endpoint de manutenções pendentes (se existir)
-      try {
-        const resManut = await api.get("/manutencao/pendentes");
-        if (Array.isArray(resManut.data)) {
-          pendentesManut = resManut.data.length;
-        }
-      } catch {
-        // ignora se não existir
+      const concluidasMov = todasMov.filter((m) =>
+        STATUS_MOV_CONCLUIDA.has(normalizarStatus(m.status))
+      ).length;
+
+      // --- Manutenções ---
+      let pendentesManut =
+        pendentesManutApi != null
+          ? pendentesManutApi.length
+          : listaManut.filter((m) =>
+              STATUS_MANUT_PENDENTE.has(normalizarStatus(m.status))
+            ).length;
+
+      // Se pendentes veio no objeto de movimentacao/pendentes
+      if (
+        pendRaw &&
+        typeof pendRaw === "object" &&
+        !Array.isArray(pendRaw) &&
+        Array.isArray(pendRaw.manutencoes)
+      ) {
+        pendentesManut = Math.max(
+          pendentesManut,
+          pendRaw.manutencoes.length
+        );
       }
 
-      const movs = (resMov.data || [])
+      const concluidasManut = listaManut.filter((m) =>
+        STATUS_MANUT_CONCLUIDA.has(normalizarStatus(m.status))
+      ).length;
+
+      const movs = todasMov
         .slice()
         .sort(
           (a, b) =>
             new Date(b.dataMovimentacao || b.createdAt || 0) -
             new Date(a.dataMovimentacao || a.createdAt || 0)
+        )
+        .slice(0, 5);
+
+      const manuts = listaManut
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.dataSolicitacao || b.createdAt || 0) -
+            new Date(a.dataSolicitacao || a.createdAt || 0)
         )
         .slice(0, 5);
 
@@ -106,8 +201,11 @@ export default function DashboardScreen() {
         emManutencao,
         pendentesMov,
         pendentesManut,
+        concluidasMov,
+        concluidasManut,
       });
       setUltimasMov(movs);
+      setUltimasManut(manuts);
     } catch {
       mostrarToast("Não foi possível carregar o dashboard.", "erro");
     } finally {
@@ -127,6 +225,24 @@ export default function DashboardScreen() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const badgeStatus = (status) => {
+    const st = normalizarStatus(status);
+    if (STATUS_MOV_CONCLUIDA.has(st) || STATUS_MANUT_CONCLUIDA.has(st)) {
+      return { label: status || "Concluída", bg: "#ecfdf5", cor: "#059669" };
+    }
+    if (STATUS_MOV_PENDENTE.has(st) || STATUS_MANUT_PENDENTE.has(st)) {
+      return { label: status || "Pendente", bg: "#fffbeb", cor: "#d97706" };
+    }
+    if (st === "REPROVADA" || st === "REPROVADO") {
+      return { label: status || "Reprovada", bg: "#fef2f2", cor: "#dc2626" };
+    }
+    return {
+      label: status || "—",
+      bg: "#f1f5f9",
+      cor: "#64748b",
+    };
   };
 
   const cards = [
@@ -150,12 +266,12 @@ export default function DashboardScreen() {
       label: "Em uso",
       value: stats.emUso,
       icon: IoSwapHorizontalOutline,
-      color: "#2563eb",
-      bg: "#eff6ff",
+      color: IFPE.primary,
+      bg: IFPE.primaryLight,
       onClick: () => navigate("/movimentacoes"),
     },
     {
-      label: "Manutenção",
+      label: "Em manutenção",
       value: stats.emManutencao,
       icon: IoConstructOutline,
       color: "#d97706",
@@ -177,7 +293,9 @@ export default function DashboardScreen() {
         <div style={styles.topo}>
           <div>
             <h2 style={styles.titulo}>Painel gerencial</h2>
-            <p style={styles.subtitulo}>Resumo do inventário e solicitações</p>
+            <p style={styles.subtitulo}>
+              Inventário, pendências e histórico concluído
+            </p>
           </div>
           <button
             type="button"
@@ -197,7 +315,6 @@ export default function DashboardScreen() {
           </div>
         ) : (
           <>
-            {/* Cards principais */}
             <div style={styles.grid}>
               {cards.map((c) => {
                 const Icon = c.icon;
@@ -218,7 +335,45 @@ export default function DashboardScreen() {
               })}
             </div>
 
-            {/* Alertas pendentes */}
+            {/* Concluídas */}
+            <div style={styles.secao}>
+              <h3 style={styles.secaoTitulo}>Concluídas</h3>
+              <div style={styles.gridConcluidas}>
+                <div style={styles.cardConcluida}>
+                  <div style={styles.concluidaIcon}>
+                    <IoCheckmarkDoneOutline size={20} color={IFPE.primary} />
+                  </div>
+                  <div>
+                    <div style={styles.concluidaValor}>
+                      {stats.concluidasMov}
+                    </div>
+                    <div style={styles.concluidaLabel}>
+                      Transferências concluídas
+                    </div>
+                  </div>
+                </div>
+                <div style={styles.cardConcluida}>
+                  <div
+                    style={{
+                      ...styles.concluidaIcon,
+                      backgroundColor: "#ecfdf5",
+                    }}
+                  >
+                    <IoConstructOutline size={20} color="#059669" />
+                  </div>
+                  <div>
+                    <div style={styles.concluidaValor}>
+                      {stats.concluidasManut}
+                    </div>
+                    <div style={styles.concluidaLabel}>
+                      Manutenções concluídas
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pendências */}
             <div style={styles.secao}>
               <h3 style={styles.secaoTitulo}>Pendências</h3>
               <button
@@ -272,7 +427,9 @@ export default function DashboardScreen() {
             {/* Últimas movimentações */}
             <div style={styles.secao}>
               <div style={styles.secaoHeader}>
-                <h3 style={styles.secaoTitulo}>Últimas movimentações</h3>
+                <h3 style={{ ...styles.secaoTitulo, marginBottom: 0 }}>
+                  Últimas movimentações
+                </h3>
                 <button
                   type="button"
                   style={styles.linkVer}
@@ -285,31 +442,91 @@ export default function DashboardScreen() {
               {ultimasMov.length === 0 ? (
                 <p style={styles.vazio}>Nenhuma movimentação recente.</p>
               ) : (
-                ultimasMov.map((item) => (
-                  <div key={item.id} style={styles.movCard}>
-                    <div style={styles.movTop}>
-                      <span style={styles.movCodigo}>
-                        {item.patrimonio?.codigoPatrimonio ||
-                          item.material?.nome ||
-                          "Movimentação"}
-                      </span>
-                      <span style={styles.movData}>
-                        {formatarData(
-                          item.dataMovimentacao || item.createdAt
-                        )}
-                      </span>
-                    </div>
-                    <div style={styles.movRota}>
-                      {item.localOrigem?.nome || "—"} →{" "}
-                      {item.localDestino?.nome || "—"}
-                    </div>
-                    {item.usuario?.nome && (
-                      <div style={styles.movAutor}>
-                        Por: {item.usuario.nome}
+                ultimasMov.map((item) => {
+                  const b = badgeStatus(item.status);
+                  return (
+                    <div key={item.id} style={styles.movCard}>
+                      <div style={styles.movTop}>
+                        <span style={styles.movCodigo}>
+                          {item.patrimonio?.codigoPatrimonio ||
+                            item.material?.nome ||
+                            "Movimentação"}
+                        </span>
+                        <span
+                          style={{
+                            ...styles.statusPill,
+                            backgroundColor: b.bg,
+                            color: b.cor,
+                          }}
+                        >
+                          {b.label}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))
+                      <div style={styles.movRota}>
+                        {item.localOrigem?.nome || "—"} →{" "}
+                        {item.localDestino?.nome || "—"}
+                      </div>
+                      <div style={styles.movMeta}>
+                        <span>
+                          {formatarData(
+                            item.dataMovimentacao || item.createdAt
+                          )}
+                        </span>
+                        {item.usuario?.nome && (
+                          <span>Por: {item.usuario.nome}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Últimas manutenções */}
+            <div style={styles.secao}>
+              <h3 style={styles.secaoTitulo}>Últimas manutenções</h3>
+              {ultimasManut.length === 0 ? (
+                <p style={styles.vazio}>Nenhuma manutenção recente.</p>
+              ) : (
+                ultimasManut.map((item) => {
+                  const b = badgeStatus(item.status);
+                  return (
+                    <div key={item.id} style={styles.movCard}>
+                      <div style={styles.movTop}>
+                        <span style={styles.movCodigo}>
+                          {item.patrimonio?.codigoPatrimonio ||
+                            "Manutenção #" + item.id}
+                        </span>
+                        <span
+                          style={{
+                            ...styles.statusPill,
+                            backgroundColor: b.bg,
+                            color: b.cor,
+                          }}
+                        >
+                          {b.label}
+                        </span>
+                      </div>
+                      {item.descricao && (
+                        <div style={styles.movRota}>
+                          {item.descricao.length > 80
+                            ? item.descricao.slice(0, 80) + "…"
+                            : item.descricao}
+                        </div>
+                      )}
+                      <div style={styles.movMeta}>
+                        <span>
+                          {formatarData(
+                            item.dataSolicitacao || item.createdAt
+                          )}
+                        </span>
+                        {item.solicitante?.nome && (
+                          <span>Por: {item.solicitante.nome}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -428,7 +645,42 @@ const styles = {
     fontWeight: 700,
     fontSize: 13,
     cursor: "pointer",
-    marginBottom: 10,
+  },
+  gridConcluidas: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: 10,
+  },
+  cardConcluida: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: 14,
+    padding: 14,
+  },
+  concluidaIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: IFPE.primaryLight,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  concluidaValor: {
+    fontSize: 22,
+    fontWeight: 800,
+    color: "#0f172a",
+    lineHeight: 1,
+  },
+  concluidaLabel: {
+    fontSize: 11,
+    color: "#64748b",
+    fontWeight: 600,
+    marginTop: 2,
   },
   alertaCard: {
     width: "100%",
@@ -476,6 +728,7 @@ const styles = {
   movTop: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     gap: 8,
     marginBottom: 4,
   },
@@ -484,18 +737,25 @@ const styles = {
     fontWeight: 700,
     color: "#0f172a",
   },
-  movData: {
-    fontSize: 11,
-    color: "#94a3b8",
+  statusPill: {
+    fontSize: 10,
+    fontWeight: 700,
+    padding: "2px 8px",
+    borderRadius: 8,
+    textTransform: "uppercase",
+    whiteSpace: "nowrap",
   },
   movRota: {
     fontSize: 12,
     color: "#475569",
   },
-  movAutor: {
+  movMeta: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 8,
     fontSize: 11,
     color: "#94a3b8",
-    marginTop: 4,
+    marginTop: 6,
   },
   vazio: {
     fontSize: 13,

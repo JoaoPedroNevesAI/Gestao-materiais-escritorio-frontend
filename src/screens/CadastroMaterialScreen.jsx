@@ -16,6 +16,7 @@ import {
   IoPricetag,
   IoLocation,
   IoAddCircleOutline,
+  IoCashOutline,
 } from "react-icons/io5";
 import api from "../services/api";
 import Toast from "../components/Toast";
@@ -27,6 +28,38 @@ const IFPE = {
   primaryBorder: "#bbf7d0",
   primaryText: "#14532d",
 };
+
+function formatarValorExibicao(centavosOuNumero) {
+  if (centavosOuNumero === null || centavosOuNumero === undefined || centavosOuNumero === "")
+    return "";
+  const n = Number(centavosOuNumero);
+  if (isNaN(n)) return "";
+  return n.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Digita só números; interpreta como centavos (ex: 1500 → 15,00) */
+function mascaraValor(texto) {
+  const digits = String(texto).replace(/\D/g, "");
+  if (!digits) return "";
+  const n = parseInt(digits, 10) / 100;
+  return n.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function parseValorParaNumero(textoFormatado) {
+  if (!textoFormatado || !String(textoFormatado).trim()) return null;
+  const normalizado = String(textoFormatado)
+    .replace(/\./g, "")
+    .replace(",", ".")
+    .replace(/[^\d.]/g, "");
+  const n = parseFloat(normalizado);
+  return isNaN(n) ? null : n;
+}
 
 export default function CadastroMaterialScreen() {
   const navigate = useNavigate();
@@ -40,6 +73,11 @@ export default function CadastroMaterialScreen() {
   const [imagemFile, setImagemFile] = useState(null);
   const [quantidade, setQuantidade] = useState(
     materialEdicao?.quantidade ? String(materialEdicao.quantidade) : "1"
+  );
+  const [valor, setValor] = useState(
+    materialEdicao?.valor != null && materialEdicao?.valor !== ""
+      ? formatarValorExibicao(materialEdicao.valor)
+      : ""
   );
   const [loading, setLoading] = useState(false);
   const [camposFocados, setCamposFocados] = useState({});
@@ -56,7 +94,6 @@ export default function CadastroMaterialScreen() {
   const [modalCat, setModalCat] = useState(false);
   const [modalLoc, setModalLoc] = useState(false);
 
-  // Criar categoria / local
   const [novoNomeCat, setNovoNomeCat] = useState("");
   const [novoNomeLoc, setNovoNomeLoc] = useState("");
   const [salvandoCat, setSalvandoCat] = useState(false);
@@ -109,7 +146,7 @@ export default function CadastroMaterialScreen() {
     setSalvandoCat(true);
     try {
       const { data } = await api.post("/categoria", { nome: nomeCat });
-      const criada = data || { id: data?.id, nome: nomeCat };
+      const criada = data?.id ? data : { ...data, nome: nomeCat };
       setCategorias((prev) => [...prev, criada]);
       setCategoriaSelecionada(criada);
       setNovoNomeCat("");
@@ -134,7 +171,7 @@ export default function CadastroMaterialScreen() {
     setSalvandoLoc(true);
     try {
       const { data } = await api.post("/local", { nome: nomeLoc });
-      const criado = data || { id: data?.id, nome: nomeLoc };
+      const criado = data?.id ? data : { ...data, nome: nomeLoc };
       setLocais((prev) => [...prev, criado]);
       setLocalSelecionado(criado);
       setNovoNomeLoc("");
@@ -196,6 +233,13 @@ export default function CadastroMaterialScreen() {
       mostrarToast("A quantidade deve ser um número maior que zero.", "aviso");
       return false;
     }
+    if (valor.trim()) {
+      const v = parseValorParaNumero(valor);
+      if (v === null || v < 0) {
+        mostrarToast("Informe um valor válido (R$).", "aviso");
+        return false;
+      }
+    }
     return true;
   };
 
@@ -203,11 +247,14 @@ export default function CadastroMaterialScreen() {
     if (!validar()) return;
     setLoading(true);
 
+    const valorNumerico = parseValorParaNumero(valor);
+
     const payload = {
       nome: nome.trim(),
       quantidade: parseInt(quantidade, 10),
       categoriaId: categoriaSelecionada.id,
       localId: localSelecionado.id,
+      valor: valorNumerico,
     };
 
     const isImagemNova = !!imagemFile;
@@ -270,8 +317,7 @@ export default function CadastroMaterialScreen() {
     setSelecionado,
     titulo,
     IconHeader,
-    // extras para criar item
-    tipoCriacao // "categoria" | "local"
+    tipoCriacao
   ) => {
     if (!visivel) return null;
 
@@ -331,7 +377,6 @@ export default function CadastroMaterialScreen() {
             )}
           </div>
 
-          {/* Criar novo */}
           <div style={styles.criarBox}>
             <span style={styles.criarLabel}>
               {isCat ? "Nova categoria" : "Novo local"}
@@ -470,6 +515,31 @@ export default function CadastroMaterialScreen() {
               onBlur={() => setCamposFocados((f) => ({ ...f, nome: false }))}
             />
           </div>
+
+          <label style={styles.label}>VALOR UNITÁRIO (R$)</label>
+          <div
+            style={{
+              ...styles.inputWrapper,
+              ...(camposFocados.valor ? styles.inputWrapperFocado : {}),
+            }}
+          >
+            <IoCashOutline
+              size={18}
+              color={camposFocados.valor ? IFPE.primary : "#94a3b8"}
+              style={styles.inputIcon}
+            />
+            <span style={styles.prefixoMoeda}>R$</span>
+            <input
+              style={styles.input}
+              value={valor}
+              onChange={(e) => setValor(mascaraValor(e.target.value))}
+              placeholder="0,00"
+              inputMode="numeric"
+              onFocus={() => setCamposFocados((f) => ({ ...f, valor: true }))}
+              onBlur={() => setCamposFocados((f) => ({ ...f, valor: false }))}
+            />
+          </div>
+          <p style={styles.helperText}>Opcional. Ex.: digite 150050 → R$ 1.500,50</p>
 
           {!modoEdicao && (
             <>
@@ -671,6 +741,12 @@ const styles = {
   inputIcon: {
     marginRight: 10,
     flexShrink: 0,
+  },
+  prefixoMoeda: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#64748b",
+    marginRight: 6,
   },
   input: {
     flex: 1,
